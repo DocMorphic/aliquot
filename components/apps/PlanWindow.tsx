@@ -13,7 +13,14 @@ import type {
   ValidationCriterion,
 } from "@/lib/types";
 
-type Tab = "protocol" | "materials" | "equipment" | "budget" | "timeline" | "validation";
+type Tab =
+  | "protocol"
+  | "materials"
+  | "equipment"
+  | "budget"
+  | "timeline"
+  | "validation"
+  | "references";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "protocol", label: "Protocol" },
@@ -22,6 +29,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "budget", label: "Budget" },
   { id: "timeline", label: "Timeline" },
   { id: "validation", label: "Validation" },
+  { id: "references", label: "References" },
 ];
 
 export function PlanWindow() {
@@ -132,12 +140,13 @@ export function PlanWindow() {
               borderColor: "var(--color-border)",
               color: "var(--color-text-secondary)",
             }}
+            title="Caveats and warnings the AI Scientist flagged for the bench. Always read these before starting."
           >
             <span
               className="mr-2 font-semibold tracking-wider"
               style={{ color: "var(--color-warn)", fontSize: 10 }}
             >
-              CAVEATS
+              ⚠ REVIEWER NOTES
             </span>
             <span style={{ lineHeight: 1.5 }}>{plan.notes}</span>
           </div>
@@ -150,6 +159,7 @@ export function PlanWindow() {
           {tab === "budget" && <BudgetTab plan={plan} pending={isPending} />}
           {tab === "timeline" && <TimelineTab plan={plan} pending={isPending} />}
           {tab === "validation" && <ValidationTab plan={plan} pending={isPending} />}
+          {tab === "references" && <ReferencesTab plan={plan} pending={isPending} />}
         </div>
 
         {plan?.runStats && status === "done" && (
@@ -362,37 +372,148 @@ function EquipmentTab({ plan, pending }: { plan: ExperimentPlan | null; pending:
 function BudgetTab({ plan, pending }: { plan: ExperimentPlan | null; pending: boolean }) {
   if (!plan?.budget?.lines?.length)
     return <EmptyOrSkeleton pending={pending} hint="Budget breakdown appears here." />;
+
+  // Aggregate by category for the stacked-bar overview.
+  const byCategory = new Map<string, number>();
+  for (const l of plan.budget.lines) {
+    byCategory.set(l.category, (byCategory.get(l.category) ?? 0) + l.amount);
+  }
+  const categories = Array.from(byCategory.entries()).sort((a, b) => b[1] - a[1]);
+  const total = plan.budget.total;
+  const currency = plan.budget.currency;
+  const symbol = currencySymbol(currency);
+
+  // Stable color per category — keeps the legend↔bar correspondence
+  // obvious when the user re-renders.
+  const COLORS: Record<string, string> = {
+    materials: "#1E40AF",
+    labor: "#0F766E",
+    equipment: "#B45309",
+    overhead: "#6D28D9",
+  };
+  const colorFor = (c: string) => COLORS[c] ?? "var(--color-text-muted)";
+
   return (
     <div>
-      <table className="w-full text-[12.5px]">
-        <thead>
-          <tr style={{ color: "var(--color-text-muted)", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            <th className="pb-2 text-left font-semibold">Category</th>
-            <th className="pb-2 text-left font-semibold">Item</th>
-            <th className="pb-2 text-right font-semibold">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {plan.budget.lines.map((l, i) => (
-            <BudgetRow key={i} l={l} />
-          ))}
-        </tbody>
-      </table>
+      {/* Top: prominent total + cost-per-step rough metric for context */}
       <div
-        className="mt-4 flex items-center justify-between border-t pt-3 text-[14px]"
-        style={{ borderColor: "var(--color-border-strong)", fontWeight: 600 }}
+        className="mb-4 flex items-baseline justify-between border-b pb-3"
+        style={{ borderColor: "var(--color-border-strong)" }}
       >
-        <span>Total</span>
-        <span className="tabular-nums">
-          {plan.budget.currency}
-          {plan.budget.total.toLocaleString()}
-        </span>
+        <div>
+          <div
+            className="text-[10.5px] font-semibold tracking-wider"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            TOTAL ESTIMATED COST
+          </div>
+          <div
+            className="mt-0.5 text-[26px] tabular-nums"
+            style={{ color: "var(--color-text)", fontWeight: 600, letterSpacing: "-0.02em" }}
+          >
+            {symbol}
+            {total.toLocaleString()}
+          </div>
+        </div>
+        {plan.protocol.length > 0 && (
+          <div className="text-right">
+            <div
+              className="text-[10.5px] font-semibold tracking-wider"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              COST PER STEP
+            </div>
+            <div
+              className="mt-0.5 text-[15px] tabular-nums"
+              style={{ color: "var(--color-text-secondary)", fontWeight: 500 }}
+            >
+              ~{symbol}
+              {Math.round(total / plan.protocol.length).toLocaleString()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Stacked bar — visual share by category */}
+      <div className="mb-2">
+        <div
+          className="mb-1 text-[10.5px] font-semibold tracking-wider"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          BREAKDOWN
+        </div>
+        <div
+          className="flex h-3 w-full overflow-hidden"
+          style={{
+            border: "1px solid var(--color-border)",
+            borderRadius: 4,
+            background: "var(--color-surface-alt)",
+          }}
+        >
+          {categories.map(([cat, amt]) => (
+            <div
+              key={cat}
+              title={`${cat}: ${symbol}${amt.toLocaleString()} (${Math.round((amt / total) * 100)}%)`}
+              style={{
+                width: `${(amt / total) * 100}%`,
+                background: colorFor(cat),
+              }}
+            />
+          ))}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+          {categories.map(([cat, amt]) => (
+            <span key={cat} className="flex items-center gap-1.5" style={{ color: "var(--color-text-secondary)" }}>
+              <span
+                className="inline-block h-2.5 w-2.5"
+                style={{ background: colorFor(cat), borderRadius: 2 }}
+              />
+              <span style={{ textTransform: "capitalize" }}>{cat}</span>
+              <span className="tabular-nums" style={{ color: "var(--color-text-muted)" }}>
+                {symbol}
+                {amt.toLocaleString()} ({Math.round((amt / total) * 100)}%)
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div
+          className="mb-2 text-[10.5px] font-semibold tracking-wider"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          LINE ITEMS
+        </div>
+        <table className="w-full text-[12.5px]">
+          <thead>
+            <tr style={{ color: "var(--color-text-muted)", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <th className="pb-2 text-left font-semibold">Category</th>
+              <th className="pb-2 text-left font-semibold">Item</th>
+              <th className="pb-2 text-right font-semibold">Amount</th>
+              <th className="pb-2 text-right font-semibold">% of total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {plan.budget.lines.map((l, i) => (
+              <BudgetRow key={i} l={l} total={total} />
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
-function BudgetRow({ l }: { l: BudgetLine }) {
+function currencySymbol(s: string): string {
+  if (s === "USD" || s === "$") return "$";
+  if (s === "EUR" || s === "€") return "€";
+  if (s === "GBP" || s === "£") return "£";
+  return s;
+}
+
+function BudgetRow({ l, total }: { l: BudgetLine; total: number }) {
+  const pct = total > 0 ? (l.amount / total) * 100 : 0;
   return (
     <tr style={{ borderTop: "1px solid var(--color-border)" }}>
       <td className="py-2 align-top">
@@ -407,8 +528,14 @@ function BudgetRow({ l }: { l: BudgetLine }) {
         )}
       </td>
       <td className="py-2 text-right align-top tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
-        {l.currency}
+        {currencySymbol(l.currency)}
         {l.amount.toLocaleString()}
+      </td>
+      <td
+        className="py-2 text-right align-top tabular-nums text-[11px]"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        {pct.toFixed(1)}%
       </td>
     </tr>
   );
@@ -489,6 +616,93 @@ function ValidationRow({ v }: { v: ValidationCriterion }) {
         Method: {v.method}
       </div>
     </li>
+  );
+}
+
+function ReferencesTab({ plan, pending }: { plan: ExperimentPlan | null; pending: boolean }) {
+  const refs = plan?.references ?? [];
+  if (refs.length === 0)
+    return (
+      <EmptyOrSkeleton
+        pending={pending}
+        hint="Papers surfaced by the lit-QC stage appear here. Click any title to read the source."
+      />
+    );
+  return (
+    <div>
+      <p
+        className="mb-3 text-[11.5px]"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        These are the papers the lit-QC stage flagged as closest to the hypothesis.
+        Use them to verify novelty and to anchor your protocol decisions.
+      </p>
+      <ul className="space-y-2">
+        {refs.map((r, i) => {
+          const href = r.url || (r.doi ? `https://doi.org/${r.doi}` : null);
+          return (
+            <li
+              key={i}
+              className="border p-3"
+              style={{
+                background: "var(--color-surface)",
+                borderColor: "var(--color-border)",
+                borderRadius: 4,
+              }}
+            >
+              <div className="text-[12.5px]" style={{ color: "var(--color-text)", lineHeight: 1.4 }}>
+                {href ? (
+                  <a href={href} target="_blank" rel="noreferrer" className="content-link">
+                    {r.title}
+                  </a>
+                ) : (
+                  r.title
+                )}
+              </div>
+              <div
+                className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                <span>
+                  {r.authors.slice(0, 4).join(", ")}
+                  {r.authors.length > 4 ? " et al." : ""}
+                </span>
+                {r.year && (
+                  <>
+                    <span>·</span>
+                    <span>{r.year}</span>
+                  </>
+                )}
+                <span>·</span>
+                <span style={{ color: "var(--color-accent)" }}>
+                  {r.source.replace("_", " ")}
+                </span>
+                {typeof r.similarity === "number" && (
+                  <>
+                    <span>·</span>
+                    <span className="tabular-nums">{(r.similarity * 100).toFixed(0)}% match</span>
+                  </>
+                )}
+                {r.doi && (
+                  <>
+                    <span>·</span>
+                    <a
+                      href={`https://doi.org/${r.doi}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="content-link font-mono"
+                      style={{ fontSize: 10.5 }}
+                    >
+                      doi:{r.doi}
+                    </a>
+                  </>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

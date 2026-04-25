@@ -6,7 +6,12 @@ interface WindowContentProps {
 export function WindowContent({ children, noPadding }: WindowContentProps) {
   return (
     <div
-      className={`custom-scrollbar flex-1 overflow-y-auto ${
+      // The desktop root has `select-none` to prevent the OS chrome
+      // (icons, dock, menubar) from accidentally selecting text on drag.
+      // Window content needs the opposite — users want to copy protocol
+      // steps, references, catalog #s. `select-text` on the wrapper
+      // overrides the parent for everything inside windows.
+      className={`custom-scrollbar select-text flex-1 overflow-y-auto ${
         noPadding ? "" : "px-6 py-5"
       }`}
       style={{ color: "var(--color-text)", background: "var(--color-surface-solid)" }}

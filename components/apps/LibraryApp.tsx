@@ -66,6 +66,28 @@ export function LibraryApp() {
     [loadFromHistory, openWindow, focusWindow]
   );
 
+  const handleDelete = useCallback(
+    async (id: string, hypothesisPreview: string) => {
+      const ok = window.confirm(
+        `Delete this experiment?\n\n"${hypothesisPreview.slice(0, 120)}${
+          hypothesisPreview.length > 120 ? "…" : ""
+        }"\n\nThis also removes its plan, references, and any corrections. Cannot be undone.`
+      );
+      if (!ok) return;
+      // Optimistic remove — drop from the list immediately, then verify
+      // server-side. If the server returns an error, reload from source.
+      setExperiments((prev) => prev?.filter((e) => e.id !== id) ?? prev);
+      try {
+        const res = await fetch(`/api/experiments/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (err) {
+        setLoadError(`Delete failed: ${(err as Error).message}`);
+        void load();
+      }
+    },
+    [load]
+  );
+
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-baseline justify-between">
@@ -126,6 +148,7 @@ export function LibraryApp() {
                 pinned={e.id === experimentId}
                 inMemoryPlan={e.id === experimentId ? plan : null}
                 onLoad={handleLoadIntoPlan}
+                onDelete={handleDelete}
               />
             ))}
           </ul>
@@ -181,9 +204,10 @@ interface ExperimentCardProps {
   pinned: boolean;
   inMemoryPlan: ExperimentPlan | null;
   onLoad: (id: string) => void;
+  onDelete: (id: string, hypothesisPreview: string) => void;
 }
 
-function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad }: ExperimentCardProps) {
+function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad, onDelete }: ExperimentCardProps) {
   const [expanded, setExpanded] = useState(pinned);
   const [detail, setDetail] = useState<ExperimentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -285,6 +309,7 @@ function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad }: ExperimentCardPro
           references={detail?.references ?? []}
           confidence={exp.overallConfidence}
           onLoad={() => onLoad(exp.id)}
+          onDelete={() => onDelete(exp.id, exp.hypothesis)}
           isLoaded={pinned}
         />
       )}
@@ -300,6 +325,7 @@ function ExpandedDetail({
   references,
   confidence,
   onLoad,
+  onDelete,
   isLoaded,
 }: {
   loading: boolean;
@@ -309,6 +335,7 @@ function ExpandedDetail({
   references: Reference[];
   confidence: number | null;
   onLoad: () => void;
+  onDelete: () => void;
   isLoaded: boolean;
 }) {
   if (loading) {
@@ -348,7 +375,7 @@ function ExpandedDetail({
         lineHeight: 1.5,
       }}
     >
-      {/* Top row: novelty + confidence + load button */}
+      {/* Top row: novelty + confidence + load + delete */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
         {novelty && (
           <span style={{ color: "var(--color-text)" }}>
@@ -361,20 +388,43 @@ function ExpandedDetail({
             <span style={{ fontWeight: 500 }}>{Math.round(confidence * 100)}%</span>
           </span>
         )}
-        <button
-          onClick={onLoad}
-          disabled={isLoaded || !plan}
-          className="ml-auto border px-2.5 py-1 text-[11px] transition-colors"
-          style={{
-            background: isLoaded ? "var(--color-surface)" : "var(--color-accent)",
-            borderColor: isLoaded ? "var(--color-border)" : "var(--color-accent)",
-            color: isLoaded ? "var(--color-text-muted)" : "white",
-            borderRadius: 4,
-            cursor: isLoaded || !plan ? "default" : "pointer",
-          }}
-        >
-          {isLoaded ? "Loaded" : "Load in Plan window"}
-        </button>
+        <div className="ml-auto flex gap-1.5">
+          <button
+            onClick={onLoad}
+            disabled={isLoaded || !plan}
+            className="border px-2.5 py-1 text-[11px] transition-colors"
+            style={{
+              background: isLoaded ? "var(--color-surface)" : "var(--color-accent)",
+              borderColor: isLoaded ? "var(--color-border)" : "var(--color-accent)",
+              color: isLoaded ? "var(--color-text-muted)" : "white",
+              borderRadius: 4,
+              cursor: isLoaded || !plan ? "default" : "pointer",
+            }}
+          >
+            {isLoaded ? "Loaded" : "Load in Plan window"}
+          </button>
+          <button
+            onClick={onDelete}
+            className="border px-2.5 py-1 text-[11px] transition-colors"
+            style={{
+              background: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-error)",
+              borderRadius: 4,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(185, 28, 28, 0.08)";
+              e.currentTarget.style.borderColor = "var(--color-error)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "var(--color-surface)";
+              e.currentTarget.style.borderColor = "var(--color-border)";
+            }}
+            title="Permanently delete this experiment"
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
       {plan?.notes && (

@@ -18,7 +18,7 @@ const ACCENTS: { value: AccentColor; label: string; swatch: string }[] = [
 export function SettingsApp() {
   const {
     mode,
-    toggleMode,
+    setMode,
     brightness,
     setBrightness,
     accent,
@@ -43,18 +43,29 @@ export function SettingsApp() {
 
       <Section label="APPEARANCE">
         <Row label="Theme">
-          <button
-            onClick={toggleMode}
-            className="border px-3 py-1 text-[12px] transition-colors"
+          <div
+            className="flex overflow-hidden border"
             style={{
-              background: "var(--color-surface-alt)",
               borderColor: "var(--color-border)",
-              color: "var(--color-text)",
-              borderRadius: 4,
+              borderRadius: 6,
+              minWidth: 140,
             }}
           >
-            {mode === "dark" ? "🌙 Dark" : "☀️ Light"}
-          </button>
+            {(["light", "dark"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className="flex-1 px-3 py-1 text-[12px] transition-colors"
+                style={{
+                  background: mode === m ? "var(--color-accent)" : "transparent",
+                  color: mode === m ? "white" : "var(--color-text)",
+                  fontWeight: mode === m ? 500 : 400,
+                }}
+              >
+                {m === "light" ? "☀ Light" : "☾ Dark"}
+              </button>
+            ))}
+          </div>
         </Row>
 
         <Row label="Accent">

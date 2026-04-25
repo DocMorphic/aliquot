@@ -86,6 +86,40 @@ export async function GET(
   }
 }
 
+/**
+ * DELETE /api/experiments/:id
+ *
+ * Removes an experiment + cascades to plans, references_found, and
+ * corrections. The Library window calls this when the user clicks the
+ * delete button on a card.
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  if (!isUuid(id)) {
+    return new Response(JSON.stringify({ error: "invalid id" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  try {
+    const sb = getServerSupabase();
+    const { error } = await sb.from("experiments").delete().eq("id", id);
+    if (error) throw error;
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: (err as Error).message ?? "Unknown error" }),
+      { status: 500, headers: { "content-type": "application/json" } }
+    );
+  }
+}
+
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }

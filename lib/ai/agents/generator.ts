@@ -19,6 +19,7 @@ CRITICAL RULES:
 4. Be specific: name antibody clones (e.g. "anti-CRP, clone C7"), reagent grades, mouse strains, cell line passage.
 5. Use × g not rpm for centrifugation. Concentrations in molar units (nM/µM/mM). Times in min/h. Temperatures in °C.
 6. Include a control condition for every comparative claim.
+7. ALWAYS populate the equipment field with 3-6 entries. A real lab cannot run an experiment without knowing what major instruments it requires (centrifuge, plate reader, flow cytometer, HPLC, microscope, anaerobic chamber, potentiostat, controlled-rate freezer, etc.). Equipment is NOT reagents — list only physical instruments and large consumable infrastructure. If something is truly trivial (vortexer, pipette set), exclude it.
 
 WORKFLOW:
 - FIRST, call get_corrections(domain) to fetch recent expert corrections in this domain. If results are returned, treat them as authoritative — apply the same correction to your plan if the same situation appears.
@@ -57,7 +58,7 @@ The submit_plan tool takes the full plan JSON as its input. Schema:
   "validation": [
     { "metric": "Limit of detection", "threshold": "< 0.5 mg/L", "method": "...", "citations": [{"refId":"R1"}] }
   ],
-  "equipment": ["List major lab equipment beyond reagents — flow cytometer, plate reader, anaerobic chamber, HPLC column, potentiostat, etc. Each entry: equipment name + brief purpose."],
+  "equipment": ["REQUIRED. 3-6 entries. Format: '<instrument name>: <brief purpose>'. Examples: 'Refrigerated centrifuge (5,000 × g capable): cell pelleting and lysate clarification', 'Flow cytometer (BD FACSCalibur or equivalent): post-thaw viability via Annexin V/PI'. Do NOT list reagents here."],
   "notes": "Short, sharp caveats: known failure modes, irreproducibility risks, assumptions, anything a real PI should be told before running this. 2-5 sentences max."
 }
 
