@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme, type AccentColor, type Currency } from "@/hooks/use-theme";
+import { useModal } from "@/hooks/use-modal";
 import { MODELS } from "@/lib/constants";
 
 const CURRENCIES: { value: Currency; label: string; symbol: string }[] = [
@@ -26,9 +27,27 @@ export function SettingsApp() {
     currency,
     setCurrency,
   } = useTheme();
+  const { confirm } = useModal();
 
   const supabaseHost =
     process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/^https?:\/\//, "") ?? "(not configured)";
+
+  const handleReset = async () => {
+    const ok = await confirm({
+      title: "Reset preferences?",
+      message:
+        "Clears your theme, accent, currency, and pinned experiments. Server-side data in Supabase is untouched.",
+      confirmLabel: "Reset",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("aliquot:"))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch {}
+    window.location.reload();
+  };
 
   return (
     <div className="flex flex-col gap-5 text-[13px]">
@@ -158,16 +177,7 @@ export function SettingsApp() {
       </Section>
 
       <button
-        onClick={() => {
-          if (confirm("Reset local preferences and reload?")) {
-            try {
-              Object.keys(localStorage)
-                .filter((k) => k.startsWith("aliquot:"))
-                .forEach((k) => localStorage.removeItem(k));
-            } catch {}
-            window.location.reload();
-          }
-        }}
+        onClick={handleReset}
         className="border px-3 py-1.5 text-[11.5px] transition-colors"
         style={{
           background: "var(--color-surface-alt)",

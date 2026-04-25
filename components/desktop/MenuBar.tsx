@@ -3,12 +3,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useClock } from "@/hooks/use-clock";
 import { useWindowManager } from "@/hooks/use-window-manager";
+import { useModal } from "@/hooks/use-modal";
 import { BrightnessPopover } from "./BrightnessPopover";
 
 const CMD_KEY =
   typeof navigator !== "undefined" && /Mac/.test(navigator.platform) ? "⌘" : "Ctrl";
 
-function resetSystem() {
+function performReset() {
   try {
     const keys = Object.keys(localStorage).filter((k) => k.startsWith("aliquot:"));
     keys.forEach((k) => localStorage.removeItem(k));
@@ -26,8 +27,20 @@ export function MenuBar() {
     maximizeWindow,
     getFocusedAppId,
   } = useWindowManager();
+  const { confirm } = useModal();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const handleResetSystem = async () => {
+    const ok = await confirm({
+      title: "Reset System?",
+      message:
+        "Clears all local preferences (theme, accent, currency, pinned experiments) and reloads. Server-side data in Supabase is untouched.",
+      confirmLabel: "Reset",
+      danger: true,
+    });
+    if (ok) performReset();
+  };
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -96,7 +109,8 @@ export function MenuBar() {
           <MenuItem
             label="Reset System"
             onClick={() => {
-              if (confirm("Reset all settings and reload?")) resetSystem();
+              setOpenMenu(null);
+              void handleResetSystem();
             }}
           />
         </MenuButton>

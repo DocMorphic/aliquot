@@ -35,12 +35,13 @@ export function WindowTitleBar({
 }: WindowTitleBarProps) {
   return (
     <div
-      className={`relative flex h-9 shrink-0 items-center justify-between border-b pl-3 pr-2 ${
-        draggable ? "cursor-move" : "cursor-default"
-      }`}
+      // Title bar drives drag via pointer events — visual cursor stays
+      // default at the user's request (per polish v4 feedback).
+      className="relative flex h-9 shrink-0 items-center justify-between border-b pl-3 pr-2"
       style={{
         background: "var(--color-titlebar)",
         borderColor: "var(--color-titlebar-border)",
+        cursor: draggable ? "default" : "default",
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

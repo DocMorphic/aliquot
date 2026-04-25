@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useExperiment } from "@/hooks/use-experiment";
 import { useWindowManager } from "@/hooks/use-window-manager";
+import { useModal } from "@/hooks/use-modal";
 import type { ExperimentSummary } from "@/lib/supabase/experiments";
 import type { ExperimentPlan, Novelty, Reference } from "@/lib/types";
 
@@ -24,6 +25,7 @@ export function LibraryApp() {
     loadFromHistory,
   } = useExperiment();
   const { openWindow, focusWindow } = useWindowManager();
+  const { confirm } = useModal();
   const [experiments, setExperiments] = useState<ExperimentSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,11 +70,27 @@ export function LibraryApp() {
 
   const handleDelete = useCallback(
     async (id: string, hypothesisPreview: string) => {
-      const ok = window.confirm(
-        `Delete this experiment?\n\n"${hypothesisPreview.slice(0, 120)}${
-          hypothesisPreview.length > 120 ? "…" : ""
-        }"\n\nThis also removes its plan, references, and any corrections. Cannot be undone.`
-      );
+      const preview =
+        hypothesisPreview.length > 140
+          ? hypothesisPreview.slice(0, 140) + "…"
+          : hypothesisPreview;
+      const ok = await confirm({
+        title: "Delete this experiment?",
+        message: (
+          <>
+            <div
+              className="mb-2 italic"
+              style={{ color: "var(--color-text)", lineHeight: 1.5 }}
+            >
+              &ldquo;{preview}&rdquo;
+            </div>
+            <div>This also removes its plan, references, and any corrections. Cannot be undone.</div>
+          </>
+        ),
+        confirmLabel: "Delete",
+        cancelLabel: "Cancel",
+        danger: true,
+      });
       if (!ok) return;
       // Optimistic remove — drop from the list immediately, then verify
       // server-side. If the server returns an error, reload from source.
@@ -85,7 +103,7 @@ export function LibraryApp() {
         void load();
       }
     },
-    [load]
+    [load, confirm]
   );
 
   return (
@@ -245,10 +263,26 @@ function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad, onDelete }: Experim
   return (
     <li
       className="border"
+      // Drag this card onto the desktop area to pin it as a shortcut.
+      // Desktop.tsx onDrop reads the application/x-aliquot-experiment
+      // payload and creates a PinnedExperiment.
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(
+          "application/x-aliquot-experiment",
+          JSON.stringify({
+            experimentId: exp.id,
+            hypothesis: exp.hypothesis,
+            domain: exp.domain,
+          })
+        );
+        e.dataTransfer.effectAllowed = "copy";
+      }}
       style={{
         background: pinned ? "var(--color-surface-alt)" : "var(--color-surface)",
         borderColor: pinned ? "var(--color-accent)" : "var(--color-border)",
         borderRadius: 4,
+        cursor: "grab",
       }}
     >
       <button
