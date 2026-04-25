@@ -29,17 +29,24 @@ export const metadata: Metadata = {
   title: "Aliquot — The AI Scientist",
   description:
     "From scientific hypothesis to runnable experiment plan. Real catalog numbers, real protocols, confidence-scored. An operating system for the lab.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
   openGraph: {
     title: "Aliquot — The AI Scientist",
     description: "From hypothesis to runnable experiment plan in minutes.",
     type: "website",
+    images: ["/icon.svg"],
   },
 };
 
-// Hardcoded init script — restores theme + brightness from localStorage before
-// React hydrates to prevent flash-of-unstyled-content. No user input crosses
-// this boundary; the literal string is safe to inline.
-const FOUC_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('aliquot:theme')||'light';var b=localStorage.getItem('aliquot:brightness')||'100';document.documentElement.setAttribute('data-theme',t);document.documentElement.style.setProperty('--display-brightness',(parseInt(b,10)/100).toString())}catch(e){}})()`;
+// Hardcoded init script — restores theme + accent + brightness from
+// localStorage before React hydrates to prevent flash-of-unstyled-content.
+// useLocalStorage stores values JSON-stringified, so quotes are stripped.
+// No user input crosses this boundary; the literal string is safe to inline.
+const FOUC_INIT_SCRIPT = `(function(){try{var s=function(k,d){var v=localStorage.getItem(k);if(v==null)return d;return v.replace(/^"|"$/g,'');};var t=s('aliquot:theme','light');var a=s('aliquot:accent','blue');var b=s('aliquot:brightness','100');var d=document.documentElement;d.setAttribute('data-theme',t);d.setAttribute('data-accent',a);d.style.setProperty('--display-brightness',(parseInt(b,10)/100).toString())}catch(e){}})()`;
 
 export default function RootLayout({
   children,
@@ -50,6 +57,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="light"
+      data-accent="blue"
       suppressHydrationWarning
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >

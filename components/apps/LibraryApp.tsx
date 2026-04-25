@@ -2,10 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useExperiment } from "@/hooks/use-experiment";
+import { useWindowManager } from "@/hooks/use-window-manager";
 import type { ExperimentSummary } from "@/lib/supabase/experiments";
+import type { ExperimentPlan, Novelty, Reference } from "@/lib/types";
+
+interface ExperimentDetail {
+  id: string;
+  hypothesis: string;
+  novelty: Novelty | null;
+  createdAt: string;
+  plan: ExperimentPlan | null;
+  references: Reference[];
+}
 
 export function LibraryApp() {
-  const { hypothesis, status, plan, experimentId } = useExperiment();
+  const {
+    hypothesis,
+    status,
+    plan,
+    experimentId,
+    loadFromHistory,
+  } = useExperiment();
+  const { openWindow, focusWindow } = useWindowManager();
   const [experiments, setExperiments] = useState<ExperimentSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,16 +48,23 @@ export function LibraryApp() {
     void load();
   }, [load]);
 
-  // Refresh whenever a new experiment finishes — picks up the plan we
-  // just persisted so the user sees their fresh run without manually
-  // hitting refresh.
   useEffect(() => {
     if (status === "done" && experimentId) {
       void load();
     }
   }, [status, experimentId, load]);
 
-  const isCurrentSession = (id: string) => id === experimentId;
+  const handleLoadIntoPlan = useCallback(
+    async (id: string) => {
+      const ok = await loadFromHistory(id);
+      if (ok) {
+        openWindow("plan");
+        focusWindow("plan");
+        openWindow("lit-qc");
+      }
+    },
+    [loadFromHistory, openWindow, focusWindow]
+  );
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -49,7 +74,7 @@ export function LibraryApp() {
             Library
           </h3>
           <p className="mt-1 text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>
-            Recent experiments persisted in Supabase. Click to expand.
+            Recent experiments persisted in Supabase. Click to expand · click Load to open in Plan window.
           </p>
         </div>
         <button
@@ -82,8 +107,7 @@ export function LibraryApp() {
       )}
 
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {/* Pinned current-session card if it's running but not yet persisted */}
-        {hypothesis && status !== "done" && (
+        {hypothesis && status !== "done" && status !== "queued" && (
           <CurrentRunningCard hypothesis={hypothesis} status={status} />
         )}
 
@@ -99,8 +123,9 @@ export function LibraryApp() {
               <ExperimentCard
                 key={e.id}
                 exp={e}
-                pinned={isCurrentSession(e.id)}
-                fallbackPlan={isCurrentSession(e.id) ? plan : null}
+                pinned={e.id === experimentId}
+                inMemoryPlan={e.id === experimentId ? plan : null}
+                onLoad={handleLoadIntoPlan}
               />
             ))}
           </ul>
@@ -151,19 +176,47 @@ function CurrentRunningCard({
   );
 }
 
-function ExperimentCard({
-  exp,
-  pinned,
-  fallbackPlan,
-}: {
+interface ExperimentCardProps {
   exp: ExperimentSummary;
   pinned: boolean;
-  fallbackPlan: import("@/lib/types").ExperimentPlan | null;
-}) {
+  inMemoryPlan: ExperimentPlan | null;
+  onLoad: (id: string) => void;
+}
+
+function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad }: ExperimentCardProps) {
   const [expanded, setExpanded] = useState(pinned);
+  const [detail, setDetail] = useState<ExperimentDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
   const created = new Date(exp.createdAt);
   const date = created.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const time = created.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+  const fetchDetail = useCallback(async () => {
+    if (detail) return;
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const res = await fetch(`/api/experiments/${exp.id}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setDetail((await res.json()) as ExperimentDetail);
+    } catch (err) {
+      setDetailError((err as Error).message ?? "Failed to load");
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [detail, exp.id]);
+
+  // Auto-fetch detail when card expands.
+  useEffect(() => {
+    if (expanded) void fetchDetail();
+  }, [expanded, fetchDetail]);
+
+  // Plan content for the expanded view: prefer in-memory plan when this card
+  // is the current session (avoids the round-trip + shows the freshly-run
+  // notes/runStats), fall back to fetched detail.plan.
+  const shownPlan: ExperimentPlan | null = pinned && inMemoryPlan ? inMemoryPlan : detail?.plan ?? null;
 
   return (
     <li
@@ -224,41 +277,231 @@ function ExperimentCard({
       </button>
 
       {expanded && (
-        <div
-          className="border-t p-3 text-[11.5px]"
-          style={{
-            borderColor: "var(--color-border)",
-            color: "var(--color-text-secondary)",
-            background: "var(--color-surface-alt)",
-            lineHeight: 1.5,
-          }}
-        >
-          <div className="font-mono text-[10.5px]" style={{ color: "var(--color-text-muted)" }}>
-            ID: {exp.id}
-          </div>
-          {exp.novelty && (
-            <div className="mt-1">
-              Novelty: <span style={{ fontWeight: 500 }}>{exp.novelty.replace("_", " ")}</span>
-            </div>
-          )}
-          {typeof exp.overallConfidence === "number" && (
-            <div className="mt-1">
-              Overall confidence:{" "}
-              <span style={{ fontWeight: 500 }}>
-                {Math.round(exp.overallConfidence * 100)}%
-              </span>
-            </div>
-          )}
-          {pinned && fallbackPlan?.notes && (
-            <div className="mt-2" style={{ color: "var(--color-text)" }}>
-              <span className="font-semibold">Caveats: </span>
-              {fallbackPlan.notes.length > 220
-                ? fallbackPlan.notes.slice(0, 220) + "…"
-                : fallbackPlan.notes}
-            </div>
-          )}
-        </div>
+        <ExpandedDetail
+          loading={detailLoading}
+          error={detailError}
+          plan={shownPlan}
+          novelty={exp.novelty}
+          references={detail?.references ?? []}
+          confidence={exp.overallConfidence}
+          onLoad={() => onLoad(exp.id)}
+          isLoaded={pinned}
+        />
       )}
     </li>
+  );
+}
+
+function ExpandedDetail({
+  loading,
+  error,
+  plan,
+  novelty,
+  references,
+  confidence,
+  onLoad,
+  isLoaded,
+}: {
+  loading: boolean;
+  error: string | null;
+  plan: ExperimentPlan | null;
+  novelty: Novelty | null;
+  references: Reference[];
+  confidence: number | null;
+  onLoad: () => void;
+  isLoaded: boolean;
+}) {
+  if (loading) {
+    return (
+      <div
+        className="space-y-2 border-t p-3"
+        style={{ borderColor: "var(--color-border)", background: "var(--color-surface-alt)" }}
+      >
+        <div className="skeleton h-3 w-1/2 rounded" />
+        <div className="skeleton h-3 w-2/3 rounded" />
+        <div className="skeleton h-3 w-3/4 rounded" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div
+        className="border-t p-3 text-[11.5px]"
+        style={{
+          borderColor: "var(--color-border)",
+          background: "var(--color-surface-alt)",
+          color: "var(--color-error)",
+        }}
+      >
+        Failed to load detail: {error}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="border-t p-3 text-[11.5px]"
+      style={{
+        borderColor: "var(--color-border)",
+        background: "var(--color-surface-alt)",
+        color: "var(--color-text-secondary)",
+        lineHeight: 1.5,
+      }}
+    >
+      {/* Top row: novelty + confidence + load button */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        {novelty && (
+          <span style={{ color: "var(--color-text)" }}>
+            Novelty: <span style={{ fontWeight: 500 }}>{novelty.replace("_", " ")}</span>
+          </span>
+        )}
+        {typeof confidence === "number" && (
+          <span style={{ color: "var(--color-text)" }}>
+            Confidence:{" "}
+            <span style={{ fontWeight: 500 }}>{Math.round(confidence * 100)}%</span>
+          </span>
+        )}
+        <button
+          onClick={onLoad}
+          disabled={isLoaded || !plan}
+          className="ml-auto border px-2.5 py-1 text-[11px] transition-colors"
+          style={{
+            background: isLoaded ? "var(--color-surface)" : "var(--color-accent)",
+            borderColor: isLoaded ? "var(--color-border)" : "var(--color-accent)",
+            color: isLoaded ? "var(--color-text-muted)" : "white",
+            borderRadius: 4,
+            cursor: isLoaded || !plan ? "default" : "pointer",
+          }}
+        >
+          {isLoaded ? "Loaded" : "Load in Plan window"}
+        </button>
+      </div>
+
+      {plan?.notes && (
+        <Section label="Caveats">
+          <p style={{ color: "var(--color-text)" }}>
+            {plan.notes.length > 360 ? plan.notes.slice(0, 360) + "…" : plan.notes}
+          </p>
+        </Section>
+      )}
+
+      {plan?.protocol && plan.protocol.length > 0 && (
+        <Section label={`Protocol (${plan.protocol.length} steps)`}>
+          <ol className="space-y-1.5">
+            {plan.protocol.slice(0, 3).map((s) => (
+              <li key={s.index} style={{ color: "var(--color-text)" }}>
+                <span
+                  className="mr-2 font-mono text-[10px]"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {s.index}
+                </span>
+                {s.text.length > 200 ? s.text.slice(0, 200) + "…" : s.text}
+              </li>
+            ))}
+            {plan.protocol.length > 3 && (
+              <li style={{ color: "var(--color-text-muted)", fontSize: 10.5 }}>
+                +{plan.protocol.length - 3} more steps
+              </li>
+            )}
+          </ol>
+        </Section>
+      )}
+
+      {plan?.materials && plan.materials.length > 0 && (
+        <Section label={`Materials (${plan.materials.length})`}>
+          <ul className="space-y-1">
+            {plan.materials.slice(0, 5).map((m, i) => (
+              <li
+                key={i}
+                className="flex flex-wrap items-baseline gap-x-2"
+                style={{ color: "var(--color-text)" }}
+              >
+                <span>{m.reagent.length > 60 ? m.reagent.slice(0, 60) + "…" : m.reagent}</span>
+                <span style={{ color: "var(--color-text-muted)", fontSize: 10.5 }}>
+                  · {m.supplier} {m.catalogNumber}
+                  {typeof m.unitPrice === "number" &&
+                    ` · ${m.currency || "$"}${m.unitPrice.toFixed(2)}`}
+                </span>
+              </li>
+            ))}
+            {plan.materials.length > 5 && (
+              <li style={{ color: "var(--color-text-muted)", fontSize: 10.5 }}>
+                +{plan.materials.length - 5} more
+              </li>
+            )}
+          </ul>
+        </Section>
+      )}
+
+      {plan?.equipment && plan.equipment.length > 0 && (
+        <Section label="Equipment">
+          <ul className="list-disc pl-4 space-y-0.5" style={{ color: "var(--color-text)" }}>
+            {plan.equipment.slice(0, 5).map((e, i) => (
+              <li key={i}>{e}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {plan?.budget && plan.budget.lines.length > 0 && (
+        <Section label={`Budget — ${plan.budget.currency}${plan.budget.total.toLocaleString()} total`}>
+          <ul className="space-y-0.5">
+            {plan.budget.lines.map((l, i) => (
+              <li key={i} className="flex justify-between" style={{ color: "var(--color-text)" }}>
+                <span>{l.label}</span>
+                <span className="tabular-nums" style={{ color: "var(--color-text-muted)" }}>
+                  {l.currency}
+                  {l.amount.toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {references.length > 0 && (
+        <Section label={`References (${references.length})`}>
+          <ul className="space-y-0.5">
+            {references.slice(0, 3).map((r, i) => (
+              <li key={i} style={{ color: "var(--color-text)" }}>
+                {r.url ? (
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="content-link"
+                  >
+                    {r.title}
+                  </a>
+                ) : (
+                  r.title
+                )}
+                {r.year && (
+                  <span style={{ color: "var(--color-text-muted)", fontSize: 10.5 }}>
+                    {" "}
+                    ({r.year})
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </div>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-3 last:mb-0">
+      <div
+        className="mb-1 text-[10px] font-semibold tracking-wider"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        {label.toUpperCase()}
+      </div>
+      {children}
+    </div>
   );
 }

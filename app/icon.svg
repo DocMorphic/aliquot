@@ -1,0 +1,14 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="7" fill="#1E40AF"/>
+  <!-- Pipette body — narrow tube -->
+  <rect x="13.5" y="5.5" width="5" height="2" rx="0.5" fill="#fff"/>
+  <rect x="14.25" y="7.5" width="3.5" height="11.5" fill="#fff"/>
+  <!-- Volume marks (subtle) -->
+  <line x1="14.5" y1="11" x2="15.5" y2="11" stroke="#1E40AF" stroke-width="0.5" opacity="0.6"/>
+  <line x1="14.5" y1="14" x2="15.5" y2="14" stroke="#1E40AF" stroke-width="0.5" opacity="0.6"/>
+  <line x1="14.5" y1="17" x2="15.5" y2="17" stroke="#1E40AF" stroke-width="0.5" opacity="0.6"/>
+  <!-- Pipette tip narrowing -->
+  <path d="M14.25 19 L13 22 L19 22 L17.75 19 Z" fill="#fff"/>
+  <!-- Falling drop — teardrop shape -->
+  <path d="M16 23.5 C 13.5 26 13.5 28.5 16 28.5 C 18.5 28.5 18.5 26 16 23.5 Z" fill="#fff"/>
+</svg>

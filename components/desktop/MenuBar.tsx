@@ -54,20 +54,17 @@ export function MenuBar() {
       }}
     >
       <div className="flex items-stretch">
-        {/* Logo — Aliquot mark */}
+        {/* Logo — Aliquot pipette mark, mirrors app/icon.svg */}
         <div className="ml-3 mr-1 flex items-center">
           <div
             className="flex h-[18px] w-[18px] items-center justify-center"
-            style={{
-              background: "var(--color-accent)",
-              borderRadius: 4,
-            }}
+            style={{ background: "var(--color-accent)", borderRadius: 4 }}
             aria-hidden
           >
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-              <rect x="2" y="2" width="2" height="8" fill="white" />
-              <rect x="5" y="4" width="2" height="6" fill="white" />
-              <rect x="8" y="1" width="2" height="9" fill="white" />
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="5" y="1.5" width="2" height="4.5" fill="white" />
+              <path d="M5 6 L 4 7.5 L 8 7.5 L 7 6 Z" fill="white" />
+              <path d="M6 8 C 4.7 9.6 4.7 10.6 6 10.6 C 7.3 10.6 7.3 9.6 6 8 Z" fill="white" />
             </svg>
           </div>
         </div>

@@ -32,6 +32,7 @@ export interface RunOptions {
 
 interface ExperimentContextValue extends ExperimentState {
   runExperiment: (hypothesis: string, options?: RunOptions) => Promise<void>;
+  loadFromHistory: (experimentId: string) => Promise<boolean>;
   reset: () => void;
 }
 
@@ -135,7 +136,42 @@ export function useExperimentProvider(): ExperimentContextValue {
     setState(initialState);
   }, []);
 
-  return { ...state, runExperiment, reset };
+  /**
+   * Hydrate the experiment context with a persisted plan from history.
+   * The Library window calls this when the user clicks "Load in Plan
+   * window" — it lets us re-use the existing PlanWindow UI for browsing
+   * past runs without writing a separate viewer.
+   */
+  const loadFromHistory = useCallback(async (experimentId: string) => {
+    try {
+      const res = await fetch(`/api/experiments/${experimentId}`, { cache: "no-store" });
+      if (!res.ok) return false;
+      const detail = (await res.json()) as {
+        id: string;
+        hypothesis: string;
+        novelty: Novelty | null;
+        plan: ExperimentPlan | null;
+        references: Reference[];
+      };
+      if (!detail.plan) return false;
+      abortRef.current?.abort();
+      setState({
+        ...initialState,
+        experimentId: detail.id,
+        hypothesis: detail.hypothesis,
+        status: "done",
+        stageMessage: "Loaded from history",
+        novelty: detail.novelty,
+        references: detail.references ?? [],
+        plan: detail.plan,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  return { ...state, runExperiment, loadFromHistory, reset };
 }
 
 function applyEvent(

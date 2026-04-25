@@ -46,9 +46,10 @@ export function WindowTitleBar({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      {/* Controls — LEFT (macOS-style traffic lights) */}
+      {/* Controls — LEFT (macOS-style traffic lights). The container
+         class drives the :hover reveal of all three glyphs at once. */}
       <div
-        className="flex h-full items-center gap-1.5"
+        className="window-titlebar-controls flex h-full items-center gap-2"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -57,9 +58,9 @@ export function WindowTitleBar({
           onClick={onClose}
           aria-label="Close"
         >
-          <svg width="8" height="8" viewBox="0 0 6 6">
-            <line x1="1" y1="1" x2="5" y2="5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-            <line x1="5" y1="1" x2="1" y2="5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+          <svg width="6" height="6" viewBox="0 0 6 6">
+            <line x1="1.4" y1="1.4" x2="4.6" y2="4.6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+            <line x1="4.6" y1="1.4" x2="1.4" y2="4.6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
           </svg>
         </button>
 
@@ -69,8 +70,8 @@ export function WindowTitleBar({
             onClick={onMinimize}
             aria-label="Minimize"
           >
-            <svg width="8" height="8" viewBox="0 0 6 6">
-              <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+            <svg width="6" height="6" viewBox="0 0 6 6">
+              <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
             </svg>
           </button>
         )}
@@ -81,8 +82,18 @@ export function WindowTitleBar({
             onClick={onMaximize}
             aria-label={isMaximized ? "Restore" : "Maximize"}
           >
-            <svg width="8" height="8" viewBox="0 0 6 6">
-              <polygon points="0,5 5,5 5,0" fill="currentColor" />
+            <svg width="6" height="6" viewBox="0 0 6 6">
+              {isMaximized ? (
+                <>
+                  <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                  <line x1="3" y1="1" x2="3" y2="5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                </>
+              ) : (
+                <>
+                  <polygon points="1,4.5 4.5,4.5 4.5,1" fill="currentColor" />
+                  <polygon points="1,1.5 1.5,1 4.5,1 4.5,1.5 1.5,4.5 1,4.5" fill="currentColor" opacity="0.001" />
+                </>
+              )}
             </svg>
           </button>
         )}
