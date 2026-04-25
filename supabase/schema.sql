@@ -73,16 +73,16 @@ alter table corrections enable row level security;
 
 -- Anyone can read (anon key)
 do $$ begin
-  if not exists (select 1 from pg_policies where polname = 'public_read_experiments') then
+  if not exists (select 1 from pg_policies where policyname = 'public_read_experiments') then
     create policy public_read_experiments on experiments for select using (true);
   end if;
-  if not exists (select 1 from pg_policies where polname = 'public_read_plans') then
+  if not exists (select 1 from pg_policies where policyname = 'public_read_plans') then
     create policy public_read_plans on plans for select using (true);
   end if;
-  if not exists (select 1 from pg_policies where polname = 'public_read_refs') then
+  if not exists (select 1 from pg_policies where policyname = 'public_read_refs') then
     create policy public_read_refs on references_found for select using (true);
   end if;
-  if not exists (select 1 from pg_policies where polname = 'public_read_corrections') then
+  if not exists (select 1 from pg_policies where policyname = 'public_read_corrections') then
     create policy public_read_corrections on corrections for select using (true);
   end if;
 end $$;
