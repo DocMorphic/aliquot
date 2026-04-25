@@ -1,5 +1,5 @@
 // =====================================================================
-// Bench OS — agent stubs
+// Aliquot — agent stubs
 // =====================================================================
 // Each export here will become a real Anthropic SDK call once env keys
 // are configured. They're invoked by lib/ai/pipeline.ts in the order:

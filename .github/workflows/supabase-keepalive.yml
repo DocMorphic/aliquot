@@ -36,7 +36,7 @@ jobs:
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
-            "${SUPABASE_URL}/rest/v1/portfolio_visits?select=id&limit=1")
+            "${SUPABASE_URL}/rest/v1/experiments?select=id&limit=1")
 
           BODY=$(echo "$RESPONSE" | sed '$d')
           STATUS=$(echo "$RESPONSE" | tail -n1)

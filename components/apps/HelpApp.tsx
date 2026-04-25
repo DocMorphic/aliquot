@@ -5,7 +5,7 @@ export function HelpApp() {
     <div className="flex flex-col gap-4 text-[13px]" style={{ lineHeight: 1.6 }}>
       <div>
         <h2 className="text-[18px]" style={{ fontWeight: 600, letterSpacing: "-0.01em" }}>
-          Bench OS
+          Aliquot
         </h2>
         <p className="mt-1" style={{ color: "var(--color-text-muted)" }}>
           The AI Scientist · From hypothesis to runnable experiment plan.

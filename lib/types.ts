@@ -1,5 +1,5 @@
 // =====================================================================
-// Bench OS — domain types
+// Aliquot — domain types
 // =====================================================================
 
 // === Theme / chrome (kept from os-folio, simplified) ===
@@ -34,7 +34,7 @@ export interface AppDefinition {
   showInTaskbar: boolean;
 }
 
-// === Bench OS — experiment domain ===
+// === Aliquot — experiment domain ===
 
 export type Domain = "biology" | "chemistry" | "physics" | "climate";
 

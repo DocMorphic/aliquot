@@ -10,7 +10,7 @@ const CMD_KEY =
 
 function resetSystem() {
   try {
-    const keys = Object.keys(localStorage).filter((k) => k.startsWith("bench-os:"));
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith("aliquot:"));
     keys.forEach((k) => localStorage.removeItem(k));
   } catch {}
   window.location.reload();
@@ -54,7 +54,7 @@ export function MenuBar() {
       }}
     >
       <div className="flex items-stretch">
-        {/* Logo — Bench OS mark */}
+        {/* Logo — Aliquot mark */}
         <div className="ml-3 mr-1 flex items-center">
           <div
             className="flex h-[18px] w-[18px] items-center justify-center"
@@ -73,7 +73,7 @@ export function MenuBar() {
         </div>
 
         <MenuButton
-          label="Bench OS"
+          label="Aliquot"
           isOpen={openMenu === "bench"}
           onClick={() => setOpenMenu(openMenu === "bench" ? null : "bench")}
           onHoverOpen={() => setOpenMenu("bench")}
@@ -82,7 +82,7 @@ export function MenuBar() {
           bold
         >
           <MenuItem
-            label="About Bench OS"
+            label="About Aliquot"
             onClick={() => {
               openWindow("help");
               setOpenMenu(null);

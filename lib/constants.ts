@@ -1,6 +1,6 @@
 import type { AppDefinition } from "./types";
 
-export const STORAGE_PREFIX = "bench-os";
+export const STORAGE_PREFIX = "aliquot";
 
 export const STORAGE_KEYS = {
   theme: `${STORAGE_PREFIX}:theme`,
@@ -13,7 +13,7 @@ export const DEFAULT_THEME = {
 };
 
 // =====================================================================
-// Bench OS app registry
+// Aliquot app registry
 // =====================================================================
 export const APP_REGISTRY: Record<string, AppDefinition> = {
   hypothesis: {

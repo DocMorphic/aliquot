@@ -7,7 +7,7 @@ const BOOT_LINES = [
   "mounting /experiments ..... ok",
   "starting window manager ... ok",
   "initializing pipeline ..... ok",
-  "bench-os@lab:~$ ready",
+  "aliquot@lab:~$ ready",
 ];
 
 const LINE_STAGGER_MS = 120;
@@ -42,7 +42,7 @@ export function BootScreen() {
           className="mb-4 text-[15px] tracking-tight"
           style={{ color: "#fafaf9", fontWeight: 500 }}
         >
-          Bench OS
+          Aliquot
           <span style={{ color: "#60a5fa", marginLeft: 8 }}>·</span>
           <span style={{ color: "#78716c", marginLeft: 8 }}>The AI Scientist</span>
         </div>

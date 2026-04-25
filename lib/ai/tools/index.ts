@@ -1,5 +1,5 @@
 // =====================================================================
-// Bench OS — tool definitions for the Generator agent
+// Aliquot — tool definitions for the Generator agent
 // =====================================================================
 // These are the tool schemas + handler signatures the Generator agent
 // can call during plan synthesis. Anthropic SDK tool use format.

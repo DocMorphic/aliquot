@@ -1,4 +1,4 @@
-# Bench OS
+# Aliquot
 
 The AI Scientist — Hack-Nation × Fulcrum Science hackathon entry. Takes a plain-language scientific hypothesis and generates an operationally realistic experiment plan a real PI would trust enough to order materials and run.
 
@@ -28,7 +28,7 @@ This is a recent Next.js version with breaking changes from older training data.
 - `app/` — pages + API routes (`api/experiment/run` is the SSE pipeline orchestrator)
 - `components/desktop/` — OS chrome (boot screen, menu bar, dock, wallpaper, desktop icons)
 - `components/window/` — window manager UI (drag, resize, focus stack)
-- `components/apps/` — Bench OS app windows (HypothesisWindow, LitQcWindow, PlanWindow, ReviewWindow, HelpApp)
+- `components/apps/` — Aliquot app windows (HypothesisWindow, LitQcWindow, PlanWindow, ReviewWindow, HelpApp)
 - `hooks/use-window-manager.ts` — full window manager state, kept from os-folio
 - `lib/ai/` — Anthropic SDK wrapper, agent definitions, tool definitions, pipeline orchestrator
 - `lib/search/` — Semantic Scholar, arXiv, Tavily clients

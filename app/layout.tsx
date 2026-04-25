@@ -26,11 +26,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   ),
-  title: "Bench OS — The AI Scientist",
+  title: "Aliquot — The AI Scientist",
   description:
     "From scientific hypothesis to runnable experiment plan. Real catalog numbers, real protocols, confidence-scored. An operating system for the lab.",
   openGraph: {
-    title: "Bench OS — The AI Scientist",
+    title: "Aliquot — The AI Scientist",
     description: "From hypothesis to runnable experiment plan in minutes.",
     type: "website",
   },
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 // Hardcoded init script — restores theme + brightness from localStorage before
 // React hydrates to prevent flash-of-unstyled-content. No user input crosses
 // this boundary; the literal string is safe to inline.
-const FOUC_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('bench-os:theme')||'light';var b=localStorage.getItem('bench-os:brightness')||'100';document.documentElement.setAttribute('data-theme',t);document.documentElement.style.setProperty('--display-brightness',(parseInt(b,10)/100).toString())}catch(e){}})()`;
+const FOUC_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('aliquot:theme')||'light';var b=localStorage.getItem('aliquot:brightness')||'100';document.documentElement.setAttribute('data-theme',t);document.documentElement.style.setProperty('--display-brightness',(parseInt(b,10)/100).toString())}catch(e){}})()`;
 
 export default function RootLayout({
   children,

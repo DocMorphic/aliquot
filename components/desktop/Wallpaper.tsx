@@ -3,7 +3,7 @@
 import { useTheme } from "@/hooks/use-theme";
 
 /**
- * Bench OS wallpaper — clean paper-white in light mode, deep neutral in dark.
+ * Aliquot wallpaper — clean paper-white in light mode, deep neutral in dark.
  * A subtle dot grid evokes engineering paper without the heavy notebook
  * texture. Kept intentionally minimal so windows are the focus.
  */
