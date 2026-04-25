@@ -6,7 +6,11 @@ import { getRecentCorrections } from "@/lib/supabase/corrections";
 import type { Domain, ExperimentPlan, Reference } from "@/lib/types";
 import { extractJson } from "../json";
 
-const MAX_TOOL_TURNS = 6; // hard cap to keep cost predictable
+// Cap turns aggressively — each turn is one Sonnet round trip + tool
+// calls. With 4 turns the model can: get_corrections, search_catalog
+// (batched, ~6-8 reagents), one search_protocols if needed, then
+// submit_plan. Keeps us within the Vercel 60s SSE budget.
+const MAX_TOOL_TURNS = 4;
 
 const SYSTEM = `You are a senior PI drafting a complete, operationally realistic experiment plan.
 

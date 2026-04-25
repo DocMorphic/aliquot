@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useClock } from "@/hooks/use-clock";
 import { useWindowManager } from "@/hooks/use-window-manager";
 import { useModal } from "@/hooks/use-modal";
+import { useExperiment } from "@/hooks/use-experiment";
+import { STAGE_LABELS } from "@/lib/constants";
 import { BrightnessPopover } from "./BrightnessPopover";
+
+const RUNNING_STATUSES = new Set([
+  "validating",
+  "classifying",
+  "lit_qc",
+  "generating",
+  "verifying",
+  "scoring",
+]);
 
 const CMD_KEY =
   typeof navigator !== "undefined" && /Mac/.test(navigator.platform) ? "⌘" : "Ctrl";
@@ -18,7 +28,6 @@ function performReset() {
 }
 
 export function MenuBar() {
-  const time = useClock();
   const {
     openWindow,
     closeWindow,
@@ -28,6 +37,7 @@ export function MenuBar() {
     getFocusedAppId,
   } = useWindowManager();
   const { confirm } = useModal();
+  const { status, stageMessage, sessionSpend, runsThisSession } = useExperiment();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -196,7 +206,11 @@ export function MenuBar() {
         </MenuButton>
       </div>
 
-      <div className="flex items-stretch gap-2">
+      <div className="flex items-stretch gap-3">
+        <PipelineStatus status={status} stageMessage={stageMessage} />
+
+        <SessionSpend spend={sessionSpend} runs={runsThisSession} />
+
         <div className="relative flex items-center">
           <DisplayButton
             isOpen={openMenu === "brightness"}
@@ -206,13 +220,6 @@ export function MenuBar() {
             <BrightnessPopover onClose={() => setOpenMenu(null)} />
           )}
         </div>
-
-        <span
-          className="flex items-center text-[12px] tabular-nums"
-          style={{ color: "var(--color-menubar-text)" }}
-        >
-          {time}
-        </span>
       </div>
     </div>
   );
@@ -364,5 +371,69 @@ function DisplayButton({
         <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
       </svg>
     </button>
+  );
+}
+
+function PipelineStatus({
+  status,
+  stageMessage,
+}: {
+  status: string;
+  stageMessage: string;
+}) {
+  const running = RUNNING_STATUSES.has(status);
+  const label = running
+    ? stageMessage || STAGE_LABELS[status] || "Running"
+    : status === "needs_refinement"
+    ? "Needs refinement"
+    : status === "failed"
+    ? "Failed"
+    : "Idle";
+  return (
+    <span
+      className="flex items-center gap-1.5 text-[11.5px]"
+      style={{ color: "var(--color-menubar-text)" }}
+      title={running ? "Pipeline running" : "No experiment running"}
+    >
+      <span
+        className="inline-block h-2 w-2 rounded-full"
+        style={{
+          background: running
+            ? "var(--color-accent)"
+            : status === "failed"
+            ? "var(--color-error)"
+            : "var(--color-text-dim)",
+          animation: running ? "menu-pulse 1.4s ease-in-out infinite" : undefined,
+        }}
+      />
+      <span
+        className="hidden truncate sm:inline-block"
+        style={{ maxWidth: 220 }}
+      >
+        {label}
+      </span>
+      <style jsx>{`
+        @keyframes menu-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.85); }
+        }
+      `}</style>
+    </span>
+  );
+}
+
+function SessionSpend({ spend, runs }: { spend: number; runs: number }) {
+  const formatted = `$${spend.toFixed(2)}`;
+  return (
+    <span
+      className="flex items-center gap-1 text-[11.5px] tabular-nums"
+      style={{ color: "var(--color-menubar-text)" }}
+      title={`API spend this session — local estimate, resets on reload. ${runs} run${
+        runs === 1 ? "" : "s"
+      } so far.`}
+    >
+      <span style={{ color: "var(--color-text-muted)" }}>session:</span>
+      <span style={{ fontWeight: 500 }}>{formatted}</span>
+    </span>
   );
 }

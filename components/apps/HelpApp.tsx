@@ -4,7 +4,10 @@ export function HelpApp() {
   return (
     <div className="flex flex-col gap-4 text-[13px]" style={{ lineHeight: 1.6 }}>
       <div>
-        <h2 className="text-[18px]" style={{ fontWeight: 600, letterSpacing: "-0.01em" }}>
+        <h2
+          className="font-display text-[26px]"
+          style={{ fontWeight: 500, letterSpacing: "-0.02em" }}
+        >
           Aliquot
         </h2>
         <p className="mt-1" style={{ color: "var(--color-text-muted)" }}>

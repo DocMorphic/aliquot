@@ -39,12 +39,16 @@ export function BootScreen() {
     >
       <div className="flex flex-col items-start gap-1 font-mono text-[13px]" style={{ color: "#a8a29e" }}>
         <div
-          className="mb-4 text-[15px] tracking-tight"
-          style={{ color: "#fafaf9", fontWeight: 500 }}
+          className="font-display mb-4 text-[22px]"
+          style={{ color: "#fafaf9", fontWeight: 500, letterSpacing: "-0.01em" }}
         >
           Aliquot
-          <span style={{ color: "#60a5fa", marginLeft: 8 }}>·</span>
-          <span style={{ color: "#78716c", marginLeft: 8 }}>The AI Scientist</span>
+          <span style={{ color: "#60a5fa", marginLeft: 10, fontFamily: "system-ui" }}>·</span>
+          <span
+            style={{ color: "#78716c", marginLeft: 10, fontFamily: "system-ui", fontSize: 13 }}
+          >
+            The AI Scientist
+          </span>
         </div>
         {BOOT_LINES.map((line, i) => {
           const shown = i < linesShown;

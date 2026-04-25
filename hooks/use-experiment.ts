@@ -24,6 +24,11 @@ interface ExperimentState {
   plan: ExperimentPlan | null;
   refinement: RefinementState | null;
   error: string | null;
+  /** Accumulated estimated API spend across all runs in this page
+   *  session. Resets on reload. Surfaced in the menu bar. */
+  sessionSpend: number;
+  /** Number of full plan runs completed this session. */
+  runsThisSession: number;
 }
 
 export interface RunOptions {
@@ -46,6 +51,8 @@ const initialState: ExperimentState = {
   plan: null,
   refinement: null,
   error: null,
+  sessionSpend: 0,
+  runsThisSession: 0,
 };
 
 export const ExperimentContext = createContext<ExperimentContextValue | null>(null);
@@ -70,12 +77,15 @@ export function useExperimentProvider(): ExperimentContextValue {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
-      setState({
+      // Reset per-run fields but preserve cumulative session counters.
+      setState((prev) => ({
         ...initialState,
+        sessionSpend: prev.sessionSpend,
+        runsThisSession: prev.runsThisSession,
         hypothesis,
         status: "validating",
         stageMessage: "Checking hypothesis specificity…",
-      });
+      }));
 
       try {
         const res = await fetch("/api/experiment/run", {
@@ -114,6 +124,19 @@ export function useExperimentProvider(): ExperimentContextValue {
             try {
               const parsed = JSON.parse(payload) as PipelineEvent;
               applyEvent(parsed, setState);
+              // Phase 2: as soon as the streaming pipeline finishes
+              // its draft plan, fire the verify endpoint and merge the
+              // verified plan back into state when it returns. We do
+              // this here (instead of inside applyEvent) because the
+              // verify call needs to be async-fire-and-forget — it
+              // shouldn't block further events.
+              if (
+                parsed.type === "plan_done" &&
+                parsed.plan.verificationPending &&
+                isUuidLike(parsed.experimentId)
+              ) {
+                void verifyAndMerge(parsed.experimentId, setState, ctrl.signal);
+              }
             } catch {
               // ignore malformed events
             }
@@ -174,6 +197,59 @@ export function useExperimentProvider(): ExperimentContextValue {
   return { ...state, runExperiment, loadFromHistory, reset };
 }
 
+function isUuidLike(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(id);
+}
+
+/**
+ * Phase 2: fetch the verified plan from /api/experiment/[id]/verify
+ * and merge it into the live state. Soft-fails — if the verify call
+ * errors out the user keeps the un-verified plan but with the
+ * verifying flag flipped off so the UI stops spinning.
+ */
+async function verifyAndMerge(
+  experimentId: string,
+  setState: React.Dispatch<React.SetStateAction<ExperimentState>>,
+  signal: AbortSignal
+) {
+  try {
+    const res = await fetch(`/api/experiment/${experimentId}/verify`, {
+      method: "POST",
+      signal,
+    });
+    if (!res.ok) throw new Error(`verify HTTP ${res.status}`);
+    const data = (await res.json()) as { plan: ExperimentPlan };
+    setState((prev) => {
+      // Charge the Phase 2 delta (post-verify spend minus the Phase 1
+      // estimate already counted) to the session spend.
+      const phaseOneCost = prev.plan?.runStats?.estimatedCostUsd ?? 0;
+      const totalCost = data.plan.runStats?.estimatedCostUsd ?? phaseOneCost;
+      const delta = Math.max(0, totalCost - phaseOneCost);
+      return {
+        ...prev,
+        plan: data.plan,
+        status: "done",
+        stageMessage: "Plan ready",
+        sessionSpend: prev.sessionSpend + delta,
+        runsThisSession: prev.runsThisSession + 1,
+      };
+    });
+  } catch (err) {
+    if ((err as Error)?.name === "AbortError") return;
+    setState((prev) => {
+      if (!prev.plan) return prev;
+      return {
+        ...prev,
+        // Drop the verifying flag so the UI shows the plan as final
+        // even if verification couldn't complete.
+        plan: { ...prev.plan, verificationPending: false },
+        status: "done",
+        stageMessage: "Plan ready (verification skipped)",
+      };
+    });
+  }
+}
+
 function applyEvent(
   event: PipelineEvent,
   setState: React.Dispatch<React.SetStateAction<ExperimentState>>
@@ -201,15 +277,25 @@ function applyEvent(
           : (event.plan as ExperimentPlan),
       }));
       break;
-    case "plan_done":
+    case "plan_done": {
+      const phaseOneCost = event.plan.runStats?.estimatedCostUsd ?? 0;
       setState((prev) => ({
         ...prev,
         plan: event.plan,
         experimentId: event.experimentId,
-        status: "done",
-        stageMessage: "Plan ready",
+        // Stay in "verifying" while Phase 2 runs; the verify response
+        // flips us to "done" via verifyAndMerge below.
+        status: event.plan.verificationPending ? "verifying" : "done",
+        stageMessage: event.plan.verificationPending
+          ? "Verifying catalog numbers…"
+          : "Plan ready",
+        // Charge Phase 1 to session spend; Phase 2 adds the verifier
+        // delta when it completes.
+        sessionSpend: prev.sessionSpend + phaseOneCost,
+        runsThisSession: prev.runsThisSession + (event.plan.verificationPending ? 0 : 1),
       }));
       break;
+    }
     case "needs_refinement":
       setState((prev) => ({
         ...prev,

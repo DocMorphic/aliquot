@@ -20,7 +20,8 @@ type Tab =
   | "budget"
   | "timeline"
   | "validation"
-  | "references";
+  | "references"
+  | "caveats";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "protocol", label: "Protocol" },
@@ -30,6 +31,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "timeline", label: "Timeline" },
   { id: "validation", label: "Validation" },
   { id: "references", label: "References" },
+  { id: "caveats", label: "Caveats" },
 ];
 
 export function PlanWindow() {
@@ -75,26 +77,39 @@ export function PlanWindow() {
         >
           PLAN
         </div>
-        {TABS.map((t) => (
+        {TABS.map((t) => {
+          const hasCaveats = t.id === "caveats" && plan?.notes && plan.notes.trim().length > 0;
+          const isActive = tab === t.id;
+          return (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className="flex items-center justify-between px-3 py-1.5 text-left text-[12.5px] transition-colors"
             style={{
-              background: tab === t.id ? "var(--color-accent)" : "transparent",
-              color: tab === t.id ? "white" : "var(--color-text)",
+              background: isActive ? "var(--color-accent)" : "transparent",
+              color: isActive ? "white" : "var(--color-text)",
             }}
             onMouseEnter={(e) => {
-              if (tab !== t.id)
+              if (!isActive)
                 e.currentTarget.style.background = "var(--color-surface-hover)";
             }}
             onMouseLeave={(e) => {
-              if (tab !== t.id) e.currentTarget.style.background = "transparent";
+              if (!isActive) e.currentTarget.style.background = "transparent";
             }}
           >
-            <span>{t.label}</span>
+            <span className="flex items-center gap-1.5">
+              {t.label}
+              {hasCaveats && !isActive && (
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full"
+                  style={{ background: "var(--color-warn)" }}
+                  title="The plan has caveats from the AI scientist review"
+                />
+              )}
+            </span>
           </button>
-        ))}
+          );
+        })}
 
         <div className="mt-auto p-3">
           <button
@@ -132,26 +147,6 @@ export function PlanWindow() {
           </div>
         )}
 
-        {plan?.notes && status === "done" && (
-          <div
-            className="shrink-0 border-b px-5 py-2.5 text-[11.5px]"
-            style={{
-              background: "rgba(180, 83, 9, 0.08)",
-              borderColor: "var(--color-border)",
-              color: "var(--color-text-secondary)",
-            }}
-            title="Caveats and warnings the AI Scientist flagged for the bench. Always read these before starting."
-          >
-            <span
-              className="mr-2 font-semibold tracking-wider"
-              style={{ color: "var(--color-warn)", fontSize: 10 }}
-            >
-              ⚠ REVIEWER NOTES
-            </span>
-            <span style={{ lineHeight: 1.5 }}>{plan.notes}</span>
-          </div>
-        )}
-
         <div className="custom-scrollbar flex-1 overflow-y-auto px-5 py-4">
           {tab === "protocol" && <ProtocolTab plan={plan} pending={isPending} />}
           {tab === "materials" && <MaterialsTab plan={plan} pending={isPending} />}
@@ -160,6 +155,7 @@ export function PlanWindow() {
           {tab === "timeline" && <TimelineTab plan={plan} pending={isPending} />}
           {tab === "validation" && <ValidationTab plan={plan} pending={isPending} />}
           {tab === "references" && <ReferencesTab plan={plan} pending={isPending} />}
+          {tab === "caveats" && <CaveatsTab plan={plan} pending={isPending} />}
         </div>
 
         {plan?.runStats && status === "done" && (
@@ -617,6 +613,66 @@ function ValidationRow({ v }: { v: ValidationCriterion }) {
       </div>
     </li>
   );
+}
+
+function CaveatsTab({ plan, pending }: { plan: ExperimentPlan | null; pending: boolean }) {
+  const notes = plan?.notes?.trim();
+  if (!notes)
+    return (
+      <EmptyOrSkeleton
+        pending={pending}
+        hint="Caveats and known failure modes from the AI scientist review will appear here. None flagged for this plan."
+      />
+    );
+
+  // The Generator tends to emit notes as a numbered list. Detect and
+  // render as <ol>; otherwise render as a paragraph block.
+  const items = parseCaveats(notes);
+
+  return (
+    <div>
+      <p
+        className="mb-3 text-[11.5px]"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        Things to know before running this protocol — assumptions made by the AI scientist,
+        known failure points, and items the bench should double-check.
+      </p>
+      {items ? (
+        <ol className="space-y-2 pl-4 list-decimal" style={{ color: "var(--color-text)", lineHeight: 1.6 }}>
+          {items.map((it, i) => (
+            <li key={i} className="text-[12.5px]">
+              {it}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div
+          className="border p-3 text-[12.5px]"
+          style={{
+            background: "rgba(180, 83, 9, 0.05)",
+            borderColor: "var(--color-warn)",
+            borderRadius: 4,
+            color: "var(--color-text)",
+            lineHeight: 1.6,
+          }}
+        >
+          {notes}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Try to split numbered-list notes into individual items.
+ *  Returns null if the text doesn't look like a list. */
+function parseCaveats(text: string): string[] | null {
+  // Match "1. ..." "2. ..." style.
+  const matches = text.match(/(?:^|\s)(\d+\.\s+[^]+?)(?=\s+\d+\.\s+|\s*$)/g);
+  if (matches && matches.length >= 2) {
+    return matches.map((m) => m.replace(/^\s*\d+\.\s*/, "").trim());
+  }
+  return null;
 }
 
 function ReferencesTab({ plan, pending }: { plan: ExperimentPlan | null; pending: boolean }) {

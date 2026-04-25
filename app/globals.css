@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  /* Body sans (Geist) is the default for body text. JetBrains Mono
+     handles catalog numbers / code. Fraunces is invoked explicitly
+     via the .font-display helper for marquee headings. */
+  --font-sans: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-display: var(--font-display), Georgia, "Times New Roman", serif;
 
   --color-accent-blue: #1E40AF;
   --color-accent-teal: #0F766E;
@@ -153,7 +157,7 @@ html {
 }
 
 body {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--color-bg);
   color: var(--color-text);
   max-width: 100vw;
@@ -163,11 +167,17 @@ body {
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "cv11", "ss01", "ss03";
 }
 
 .font-mono {
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+/* Fraunces — used for marquee headings. Apply selectively. */
+.font-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  letter-spacing: -0.018em;
+  font-feature-settings: "ss01", "ss02";
 }
 
 /* === Brightness === */
@@ -196,14 +206,28 @@ body {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-hover); }
 
-/* === Window animations === */
+/* === Window animations — macOS-style scale + fade === */
 .window-enter {
-  animation: windowOpen 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: windowOpen 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes windowOpen {
-  from { opacity: 0; transform: scale(0.98) translateY(4px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Applied to the window root for ~150ms before the window-manager
+   actually unmounts the window. Mirror of windowOpen, slightly
+   shorter and without the bounce. */
+.window-closing {
+  animation: windowClose 0.15s cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes windowClose {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.94) translateY(4px); }
 }
 
 /* === Window control buttons — macOS traffic-light pattern ===

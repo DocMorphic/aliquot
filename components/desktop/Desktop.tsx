@@ -104,19 +104,15 @@ export function Desktop() {
         return;
       }
       e.preventDefault();
-      // Coordinates relative to the #desktop-content element, accounting
-      // for the icon being centered on the cursor (rough offset 46×40).
-      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-      const x = Math.max(0, e.clientX - rect.left - 46);
-      const y = Math.max(0, e.clientY - rect.top - 40);
-      const item: PinnedExperiment = {
+      // Drop coordinates intentionally ignored — pins auto-place in
+      // a sequential column layout (predictable + matches the user's
+      // mental model of icons appearing "below the existing ones").
+      // The user can drag-reposition after the pin lands.
+      desktopPins.pin({
         experimentId: payload.experimentId,
         hypothesis: payload.hypothesis,
         domain: payload.domain ?? null,
-        x,
-        y,
-      };
-      desktopPins.pin(item);
+      });
     },
     [desktopPins]
   );

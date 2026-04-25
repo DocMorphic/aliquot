@@ -52,7 +52,10 @@ export function SettingsApp() {
   return (
     <div className="flex flex-col gap-5 text-[13px]">
       <div>
-        <h2 className="text-[16px]" style={{ fontWeight: 600 }}>
+        <h2
+          className="font-display text-[22px]"
+          style={{ fontWeight: 500, letterSpacing: "-0.015em" }}
+        >
           Settings
         </h2>
         <p className="mt-1 text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>

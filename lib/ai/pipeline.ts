@@ -3,8 +3,6 @@ import { validateHypothesis } from "./agents/validator";
 import { classifyDomain } from "./agents/classifier";
 import { litQc } from "./agents/lit-qc";
 import { generatePlan } from "./agents/generator";
-import { verifyPlan } from "./agents/verifier";
-import { annotateConfidence } from "./agents/confidence";
 import { persistExperiment } from "@/lib/supabase/persist";
 
 export interface PipelineOptions {
@@ -13,21 +11,21 @@ export interface PipelineOptions {
 }
 
 /**
- * Pipeline orchestrator. Yields PipelineEvent objects as each stage
- * completes; /api/experiment/run wraps this in an SSE response.
+ * Phase 1 pipeline orchestrator (sync, must fit in <55s on Vercel Hobby).
+ * Yields PipelineEvent objects; /api/experiment/run wraps this in SSE.
  *
- * Stages currently wired:
- *   0. validate    (Haiku — gates vague prompts)
- *   1. classify    (Haiku — domain routing)
- *   2. lit_qc      (Sonnet + OpenAlex + arXiv)
- *   3. generate    (Sonnet + Tavily tool use)
- *   4. verify      (Tavily catalog re-check)
- *   5. score       (deterministic confidence)
- *   6. persist     (Supabase, soft-fail)
+ * Stages:
+ *   0. validate    (Haiku, ≤3s)
+ *   1. classify    (Haiku, ≤2s)
+ *   2. lit_qc      (Sonnet + OpenAlex + arXiv, ≤10s)
+ *   3. generate    (Sonnet + Tavily tool use, MAX_TOOL_TURNS=4, ≤40s)
+ *   4. persist     (Supabase draft, ≤2s)
+ *   5. plan_done   (un-verified plan + verificationPending=true)
  *
- * Skeptic + revise stages are intentionally deferred — the cost is high
- * and verifier already catches the most common failure mode (hallucinated
- * catalog #s).
+ * Verifier + confidence + final persist run in Phase 2 via the
+ * /api/experiment/{id}/verify endpoint, kicked off by the client as
+ * soon as the plan_done event arrives. This keeps the SSE stream
+ * inside the 60s budget while still delivering verified marks.
  */
 export async function* runPipeline(
   hypothesis: string,
@@ -35,7 +33,6 @@ export async function* runPipeline(
 ): AsyncGenerator<PipelineEvent, void, unknown> {
   const startedAt = Date.now();
   try {
-    // Stage 0 — validator (cheap Haiku call). Stops early if vague.
     yield { type: "stage", stage: "validating", message: "Checking hypothesis specificity…" };
     const validation = await validateHypothesis(hypothesis);
     if (validation.verdict === "too_vague") {
@@ -61,33 +58,20 @@ export async function* runPipeline(
       stage: "generating",
       message: "Drafting protocol with grounded sources…",
     };
-    let plan = await generatePlan(hypothesis, domain, lit.references, {
+    const draftPlan = await generatePlan(hypothesis, domain, lit.references, {
       currency: options.currency ?? "USD",
     });
-    yield { type: "plan_partial", plan };
 
-    yield {
-      type: "stage",
-      stage: "verifying",
-      message: `✅ Verifying ${plan.materials.length} catalog numbers…`,
-    };
-    plan = await verifyPlan(plan);
-
-    yield { type: "stage", stage: "scoring", message: "📊 Computing confidence scores…" };
-    plan = await annotateConfidence(plan);
-
-    // Attach run telemetry so the UI can show "Generated in X s · ~$Y".
-    const durationMs = Date.now() - startedAt;
-    plan = {
-      ...plan,
+    // Attach Phase-1 telemetry. estimatedCostUsd will be revised
+    // upward in Phase 2 once verifier costs are known.
+    const phaseOneMs = Date.now() - startedAt;
+    const planForPersist = {
+      ...draftPlan,
+      verificationPending: true,
       runStats: {
-        durationMs,
-        // Rough fixed estimate covers the typical full pipeline:
-        // Sonnet generator + verifier ~$0.10–0.18, Haiku stages ~$0.001,
-        // Tavily covered by the user's redeem code. Replace with a real
-        // token-counter once we want fine-grained billing in the demo.
-        estimatedCostUsd: roundCost(0.15 + plan.materials.length * 0.005),
-        toolCalls: plan.materials.length, // approximate — Tavily call per material
+        durationMs: phaseOneMs,
+        estimatedCostUsd: roundCost(0.10 + draftPlan.materials.length * 0.003),
+        toolCalls: draftPlan.materials.length,
       },
     };
 
@@ -95,12 +79,12 @@ export async function* runPipeline(
       hypothesis,
       novelty: lit.novelty,
       references: lit.references,
-      plan,
+      plan: planForPersist,
     });
 
     yield {
       type: "plan_done",
-      plan,
+      plan: planForPersist,
       experimentId: experimentId ?? `local-${Date.now().toString(36)}`,
     };
   } catch (err) {

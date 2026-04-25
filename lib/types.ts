@@ -145,6 +145,10 @@ export interface ExperimentPlan {
     estimatedCostUsd?: number;
     toolCalls?: number;
   };
+  /** True between Phase 1 plan_done and Phase 2 verify completion.
+   *  Transient: never persisted — set in pipeline output and cleared
+   *  by the verify endpoint. UI uses it to show "verifying…" badges. */
+  verificationPending?: boolean;
 }
 
 // === Stretch goal: feedback loop ===
