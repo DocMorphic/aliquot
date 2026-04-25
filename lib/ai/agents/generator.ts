@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropic, cachedSystemBlock } from "../client";
 import { MODELS } from "@/lib/constants";
 import { tavilySearch, tavilyCatalogSearch } from "@/lib/search/tavily";
+import { getRecentCorrections } from "@/lib/supabase/corrections";
 import type { Domain, ExperimentPlan, Reference } from "@/lib/types";
 import { extractJson } from "../json";
 
@@ -20,7 +21,8 @@ CRITICAL RULES:
 6. Include a control condition for every comparative claim.
 
 WORKFLOW:
-- First, call search_catalog for each major reagent in turn (or in batch). Limit yourself to ~6-8 tool calls total to stay efficient.
+- FIRST, call get_corrections(domain) to fetch recent expert corrections in this domain. If results are returned, treat them as authoritative — apply the same correction to your plan if the same situation appears.
+- Then call search_catalog for each major reagent in turn (or in batch). Limit yourself to ~6-8 tool calls total to stay efficient.
 - Then call submit_plan with the final structured plan. submit_plan ends the workflow.
 
 The submit_plan tool takes the full plan JSON as its input. Schema:
@@ -90,6 +92,21 @@ const TOOLS: Anthropic.Messages.Tool[] = [
         },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "get_corrections",
+    description:
+      "Retrieve recent expert corrections in this domain (from past scientist reviews). Each correction shows what was originally generated, what the scientist corrected it to, and why. APPLY these corrections to your plan when they're applicable — they encode hard-won lab knowledge. Call this once at the start.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        domain: {
+          type: "string",
+          enum: ["biology", "chemistry", "physics", "climate"],
+        },
+      },
+      required: ["domain"],
     },
   },
   {
@@ -208,6 +225,24 @@ async function runGenerator(
             tool_use_id: id,
             content: JSON.stringify(
               results.map((r) => ({ title: r.title, url: r.url, snippet: r.content?.slice(0, 600) }))
+            ),
+          });
+        } else if (name === "get_corrections") {
+          const inp = input as { domain: Domain };
+          const corrections = await getRecentCorrections(inp.domain, 5);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: id,
+            content: JSON.stringify(
+              corrections.length === 0
+                ? { note: "no prior corrections in this domain yet" }
+                : corrections.map((c) => ({
+                    section: c.section_path,
+                    original: c.original,
+                    corrected: c.corrected,
+                    rationale: c.rationale,
+                    rating: c.rating,
+                  }))
             ),
           });
         } else if (name === "submit_plan") {
