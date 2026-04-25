@@ -3,6 +3,13 @@ import { runPipeline } from "@/lib/ai/pipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Vercel Hobby caps SSE streams at 60s. Our full pipeline can take
+// 100-150s for biology hypotheses with many catalog lookups; the
+// stream gets cut at 60s on Hobby, which means the user sees the
+// generator's tool-use partial events but the final plan_done may
+// not arrive. Set maxDuration explicitly to claim the full cap;
+// upgrade to Pro (300s) before the demo if the cut-off causes pain.
+export const maxDuration = 60;
 
 /**
  * POST /api/experiment/run
