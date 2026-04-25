@@ -1,0 +1,52 @@
+name: Supabase Keep-Alive
+
+# Supabase free tier pauses projects after 1 week of inactivity.
+# This workflow pings the database every 3 days to keep it active.
+#
+# The ping is a harmless SELECT query against the portfolio_visits table.
+# It counts as "activity" for pause detection without modifying data.
+
+on:
+  schedule:
+    # Every 3 days at 08:00 UTC
+    - cron: "0 8 */3 * *"
+  # Allow manual triggering from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Query portfolio_visits
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::Missing SUPABASE_URL or SUPABASE_ANON_KEY secret"
+            exit 1
+          fi
+
+          echo "Pinging Supabase at ${SUPABASE_URL}"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/portfolio_visits?select=id&limit=1")
+
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          STATUS=$(echo "$RESPONSE" | tail -n1)
+
+          echo "HTTP status: $STATUS"
+          echo "Body: $BODY"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Supabase ping failed with status $STATUS"
+            exit 1
+          fi
+
+          echo "::notice::Supabase project is alive"

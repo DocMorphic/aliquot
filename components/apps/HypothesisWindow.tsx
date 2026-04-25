@@ -1,0 +1,135 @@
+"use client";
+
+import { useState } from "react";
+import { useExperiment } from "@/hooks/use-experiment";
+import { useWindowManager } from "@/hooks/use-window-manager";
+import { SAMPLE_HYPOTHESES } from "@/content/sample-hypotheses";
+
+export function HypothesisWindow() {
+  const { runExperiment, status, hypothesis: activeHypothesis } = useExperiment();
+  const { openWindow } = useWindowManager();
+  const [text, setText] = useState("");
+
+  const isRunning = status !== "queued" && status !== "done" && status !== "failed";
+
+  async function handleRun(submitted: string) {
+    const value = submitted.trim();
+    if (!value || isRunning) return;
+    openWindow("lit-qc");
+    openWindow("plan");
+    await runExperiment(value);
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-4">
+      <div>
+        <h2
+          className="text-[18px]"
+          style={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+        >
+          What scientific question do you want to test?
+        </h2>
+        <p
+          className="mt-1 text-[12.5px]"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          State a specific intervention, a measurable outcome with a threshold, a mechanism, and an implied control.
+        </p>
+      </div>
+
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="e.g. A paper-based electrochemical biosensor functionalized with anti-CRP antibodies will detect C-reactive protein in whole blood at concentrations below 0.5 mg/L within 10 minutes…"
+        className="w-full resize-none border p-3 text-[13px] outline-none transition-colors"
+        style={{
+          background: "var(--color-input-bg)",
+          borderColor: "var(--color-input-border)",
+          color: "var(--color-text)",
+          borderRadius: 6,
+          minHeight: 120,
+          fontFamily: "inherit",
+        }}
+        rows={6}
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            e.preventDefault();
+            void handleRun(text);
+          }
+        }}
+      />
+
+      <div>
+        <div
+          className="mb-2 text-[10.5px] font-semibold tracking-wider"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          QUICK START — SAMPLE HYPOTHESES
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {SAMPLE_HYPOTHESES.map((s) => (
+            <button
+              key={s.id}
+              className="border px-2.5 py-1 text-[11.5px] transition-colors"
+              style={{
+                background: "var(--color-surface-alt)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text-secondary)",
+                borderRadius: 4,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--color-accent)";
+                e.currentTarget.style.color = "var(--color-accent)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--color-border)";
+                e.currentTarget.style.color = "var(--color-text-secondary)";
+              }}
+              onClick={() => setText(s.hypothesis)}
+              title={s.plainEnglish}
+            >
+              <span style={{ color: "var(--color-text-muted)", marginRight: 6, fontSize: 10.5 }}>
+                {s.domain}
+              </span>
+              {s.shortLabel}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div
+        className="mt-auto flex items-center justify-between border-t pt-3"
+        style={{ borderColor: "var(--color-border)" }}
+      >
+        <div className="text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>
+          {isRunning ? (
+            <>
+              <span
+                className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full"
+                style={{ background: "var(--color-accent)" }}
+              />
+              Running… edit and re-run anytime.
+            </>
+          ) : activeHypothesis ? (
+            <>Done. Edit and submit again to re-run.</>
+          ) : (
+            <>Tip: ⌘+Enter to run.</>
+          )}
+        </div>
+        <button
+          onClick={() => void handleRun(text)}
+          disabled={!text.trim() || isRunning}
+          className="px-4 py-1.5 text-[12.5px] font-medium transition-colors"
+          style={{
+            background: !text.trim() || isRunning ? "var(--color-surface-alt)" : "var(--color-accent)",
+            color: !text.trim() || isRunning ? "var(--color-text-dim)" : "white",
+            borderRadius: 4,
+            cursor: !text.trim() || isRunning ? "not-allowed" : "pointer",
+          }}
+        >
+          {isRunning ? "Running…" : "Run"}
+        </button>
+      </div>
+    </div>
+  );
+}
