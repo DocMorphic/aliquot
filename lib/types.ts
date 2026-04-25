@@ -42,6 +42,8 @@ export type Novelty = "not_found" | "similar" | "exact";
 
 export type ExperimentStatus =
   | "queued"
+  | "validating"
+  | "needs_refinement"
   | "classifying"
   | "lit_qc"
   | "generating"
@@ -118,6 +120,8 @@ export interface ExperimentPlan {
   domain: Domain;
   protocol: ProtocolStep[];
   materials: MaterialItem[];
+  /** Major equipment beyond reagents — e.g. flow cytometer, HPLC, anaerobic chamber. */
+  equipment?: string[];
   budget: {
     lines: BudgetLine[];
     total: number;
@@ -135,6 +139,12 @@ export interface ExperimentPlan {
     validation: number;
   };
   notes?: string;
+  /** Runtime telemetry attached on plan_done — surfaced in the UI footer. */
+  runStats?: {
+    durationMs: number;
+    estimatedCostUsd?: number;
+    toolCalls?: number;
+  };
 }
 
 // === Stretch goal: feedback loop ===
@@ -157,6 +167,7 @@ export type PipelineEvent =
   | { type: "lit_qc"; novelty: Novelty; references: Reference[] }
   | { type: "plan_partial"; plan: Partial<ExperimentPlan> }
   | { type: "plan_done"; plan: ExperimentPlan; experimentId: string }
+  | { type: "needs_refinement"; reason: string; suggestions: string[] }
   | { type: "error"; message: string };
 
 // === Window context (what data flows with each window) ===

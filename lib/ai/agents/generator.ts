@@ -57,10 +57,13 @@ The submit_plan tool takes the full plan JSON as its input. Schema:
   "validation": [
     { "metric": "Limit of detection", "threshold": "< 0.5 mg/L", "method": "...", "citations": [{"refId":"R1"}] }
   ],
-  "notes": "optional short caveat about uncertainty or assumptions"
+  "equipment": ["List major lab equipment beyond reagents — flow cytometer, plate reader, anaerobic chamber, HPLC column, potentiostat, etc. Each entry: equipment name + brief purpose."],
+  "notes": "Short, sharp caveats: known failure modes, irreproducibility risks, assumptions, anything a real PI should be told before running this. 2-5 sentences max."
 }
 
-Aim for: ~5-8 protocol steps, ~6-12 materials, ~3-6 budget lines, ~3-6 timeline phases, ~2-4 validation criteria.`;
+Aim for: ~5-8 protocol steps, ~6-12 materials, ~3-6 budget lines, ~3-6 timeline phases, ~2-4 validation criteria, ~3-6 equipment items.
+
+CURRENCY: render all prices and budget amounts in {{CURRENCY}} (USD = $, EUR = €, GBP = £). Use the matching ISO symbol everywhere. Numeric values stay numeric (no commas, no symbol).`;
 
 const TOOLS: Anthropic.Messages.Tool[] = [
   {
@@ -128,19 +131,25 @@ interface GeneratorRunResult {
   toolCallCount: number;
 }
 
+export interface GeneratorOptions {
+  currency?: "USD" | "EUR" | "GBP";
+}
+
 export async function generatePlan(
   hypothesis: string,
   domain: Domain,
-  references: Reference[]
+  references: Reference[],
+  options: GeneratorOptions = {}
 ): Promise<ExperimentPlan> {
-  const result = await runGenerator(hypothesis, domain, references);
+  const result = await runGenerator(hypothesis, domain, references, options);
   return result.plan;
 }
 
 async function runGenerator(
   hypothesis: string,
   domain: Domain,
-  references: Reference[]
+  references: Reference[],
+  options: GeneratorOptions
 ): Promise<GeneratorRunResult> {
   const client = getAnthropic();
 
@@ -150,7 +159,9 @@ async function runGenerator(
         .join("\n")}`
     : "";
 
-  const userOpening = `Hypothesis:\n${hypothesis}\n\nDomain: ${domain}${refsBlock}\n\nDraft the plan. Use search_catalog for every reagent. Call submit_plan when ready.`;
+  const currency = options.currency ?? "USD";
+  const renderedSystem = SYSTEM.replace(/\{\{CURRENCY\}\}/g, currency);
+  const userOpening = `Hypothesis:\n${hypothesis}\n\nDomain: ${domain}\nCurrency: ${currency}${refsBlock}\n\nDraft the plan. Use search_catalog for every reagent. Call submit_plan when ready.`;
 
   const messages: Anthropic.Messages.MessageParam[] = [
     { role: "user", content: userOpening },
@@ -165,7 +176,7 @@ async function runGenerator(
       // 4096 cut off mid-tool-call; 12000 leaves headroom for the largest
       // plans (~6-8K tokens of structured output) without unbounded cost.
       max_tokens: 12000,
-      system: cachedSystemBlock(SYSTEM),
+      system: cachedSystemBlock(renderedSystem),
       tools: TOOLS,
       messages,
     });
@@ -329,6 +340,7 @@ function finalizePlan(
     domain,
     protocol,
     materials,
+    equipment: Array.isArray(partial.equipment) ? partial.equipment : undefined,
     budget: {
       lines: budgetLines,
       total,

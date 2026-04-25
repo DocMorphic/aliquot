@@ -13,11 +13,12 @@ import type {
   ValidationCriterion,
 } from "@/lib/types";
 
-type Tab = "protocol" | "materials" | "budget" | "timeline" | "validation";
+type Tab = "protocol" | "materials" | "equipment" | "budget" | "timeline" | "validation";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "protocol", label: "Protocol" },
   { id: "materials", label: "Materials" },
+  { id: "equipment", label: "Equipment" },
   { id: "budget", label: "Budget" },
   { id: "timeline", label: "Timeline" },
   { id: "validation", label: "Validation" },
@@ -105,10 +106,10 @@ export function PlanWindow() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex flex-1 flex-col overflow-hidden">
         {isPending && (
           <div
-            className="border-b px-5 py-2.5 text-[11.5px]"
+            className="shrink-0 border-b px-5 py-2.5 text-[11.5px]"
             style={{
               background: "var(--color-info-box)",
               borderColor: "var(--color-border)",
@@ -123,13 +124,50 @@ export function PlanWindow() {
           </div>
         )}
 
-        <div className="px-5 py-4">
+        {plan?.notes && status === "done" && (
+          <div
+            className="shrink-0 border-b px-5 py-2.5 text-[11.5px]"
+            style={{
+              background: "rgba(180, 83, 9, 0.08)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            <span
+              className="mr-2 font-semibold tracking-wider"
+              style={{ color: "var(--color-warn)", fontSize: 10 }}
+            >
+              CAVEATS
+            </span>
+            <span style={{ lineHeight: 1.5 }}>{plan.notes}</span>
+          </div>
+        )}
+
+        <div className="custom-scrollbar flex-1 overflow-y-auto px-5 py-4">
           {tab === "protocol" && <ProtocolTab plan={plan} pending={isPending} />}
           {tab === "materials" && <MaterialsTab plan={plan} pending={isPending} />}
+          {tab === "equipment" && <EquipmentTab plan={plan} pending={isPending} />}
           {tab === "budget" && <BudgetTab plan={plan} pending={isPending} />}
           {tab === "timeline" && <TimelineTab plan={plan} pending={isPending} />}
           {tab === "validation" && <ValidationTab plan={plan} pending={isPending} />}
         </div>
+
+        {plan?.runStats && status === "done" && (
+          <div
+            className="shrink-0 border-t px-5 py-2 text-[10.5px] tabular-nums"
+            style={{
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-muted)",
+              background: "var(--color-surface-alt)",
+            }}
+          >
+            Generated in {(plan.runStats.durationMs / 1000).toFixed(1)} s
+            {typeof plan.runStats.estimatedCostUsd === "number" &&
+              ` · ~$${plan.runStats.estimatedCostUsd.toFixed(2)} API cost`}
+            {typeof plan.runStats.toolCalls === "number" &&
+              ` · ${plan.runStats.toolCalls} tool calls`}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -190,57 +228,134 @@ function ProtocolStepRow({ step }: { step: ProtocolStep }) {
 function MaterialsTab({ plan, pending }: { plan: ExperimentPlan | null; pending: boolean }) {
   if (!plan?.materials?.length)
     return <EmptyOrSkeleton pending={pending} hint="Materials with catalog numbers appear here." />;
+  const verifiedCount = plan.materials.filter((m) => m.verified).length;
   return (
-    <table className="w-full text-[12px]">
-      <thead>
-        <tr style={{ color: "var(--color-text-muted)", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          <th className="pb-2 text-left font-semibold">Reagent</th>
-          <th className="pb-2 text-left font-semibold">Supplier</th>
-          <th className="pb-2 text-left font-semibold">Catalog #</th>
-          <th className="pb-2 text-right font-semibold">Qty</th>
-          <th className="pb-2 text-right font-semibold">Price</th>
-          <th className="pb-2 text-right font-semibold">Conf.</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div>
+      <div className="mb-3 flex items-baseline justify-between text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>
+        <span>{plan.materials.length} reagents</span>
+        <span>
+          {verifiedCount}/{plan.materials.length} catalog #s verified via supplier search
+        </span>
+      </div>
+      <ul className="space-y-2">
         {plan.materials.map((m, i) => (
-          <MaterialRow key={i} m={m} />
+          <MaterialCard key={i} m={m} />
         ))}
-      </tbody>
-    </table>
+      </ul>
+    </div>
   );
 }
 
-function MaterialRow({ m }: { m: MaterialItem }) {
+function MaterialCard({ m }: { m: MaterialItem }) {
+  const priceStr =
+    typeof m.unitPrice === "number"
+      ? `${m.currency || "$"}${m.unitPrice.toFixed(2)}`
+      : null;
   return (
-    <tr style={{ borderTop: "1px solid var(--color-border)" }}>
-      <td className="py-2 align-top" style={{ color: "var(--color-text)" }}>
-        {m.reagent}
-      </td>
-      <td className="py-2 align-top" style={{ color: "var(--color-text-secondary)" }}>
-        {m.supplier}
-      </td>
-      <td className="py-2 align-top font-mono" style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>
+    <li
+      className="border p-3"
+      style={{
+        background: "var(--color-surface)",
+        borderColor: "var(--color-border)",
+        borderRadius: 4,
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <span
+          className="min-w-0 flex-1 text-[13px]"
+          style={{ color: "var(--color-text)", fontWeight: 500, lineHeight: 1.4 }}
+          title={m.reagent}
+        >
+          {m.reagent}
+        </span>
+        {m.verified ? (
+          <span className="badge success shrink-0" style={{ fontSize: 10 }}>
+            ✓ verified
+          </span>
+        ) : (
+          <span className="badge warn shrink-0" style={{ fontSize: 10 }}>
+            ? unverified
+          </span>
+        )}
+      </div>
+      <div
+        className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px]"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        <span>{m.supplier}</span>
+        <span>·</span>
         {m.url ? (
-          <a href={m.url} target="_blank" rel="noreferrer" className="content-link">
+          <a
+            href={m.url}
+            target="_blank"
+            rel="noreferrer"
+            className="content-link font-mono"
+            style={{ fontSize: 11 }}
+          >
             {m.catalogNumber}
           </a>
         ) : (
-          m.catalogNumber
+          <span className="font-mono" style={{ fontSize: 11 }}>
+            {m.catalogNumber}
+          </span>
         )}
-      </td>
-      <td className="py-2 text-right align-top" style={{ color: "var(--color-text-secondary)" }}>
-        {m.quantity}
-      </td>
-      <td className="py-2 text-right align-top tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
-        {typeof m.unitPrice === "number"
-          ? `${m.currency || "$"}${m.unitPrice.toFixed(2)}`
-          : "—"}
-      </td>
-      <td className="py-2 text-right align-top">
-        {typeof m.confidence === "number" && <ConfidenceMeter value={m.confidence} />}
-      </td>
-    </tr>
+        <span>·</span>
+        <span>{m.quantity}</span>
+        {priceStr && (
+          <>
+            <span>·</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text-secondary)", fontWeight: 500 }}>
+              {priceStr}
+            </span>
+          </>
+        )}
+        {typeof m.confidence === "number" && (
+          <span className="ml-auto">
+            <ConfidenceMeter value={m.confidence} />
+          </span>
+        )}
+      </div>
+      {m.alternates && m.alternates.length > 0 && (
+        <div
+          className="mt-1.5 text-[10.5px]"
+          style={{ color: "var(--color-text-dim)" }}
+        >
+          Alternates:{" "}
+          {m.alternates
+            .map((a) => `${a.supplier} ${a.price ? `${m.currency || "$"}${a.price}` : ""}`)
+            .join(" · ")}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function EquipmentTab({ plan, pending }: { plan: ExperimentPlan | null; pending: boolean }) {
+  const equipment = plan?.equipment ?? [];
+  if (equipment.length === 0)
+    return (
+      <EmptyOrSkeleton
+        pending={pending}
+        hint="Major equipment (centrifuges, plate readers, microscopes) needed beyond reagents will appear here."
+      />
+    );
+  return (
+    <ul className="space-y-2">
+      {equipment.map((e, i) => (
+        <li
+          key={i}
+          className="border p-3 text-[13px]"
+          style={{
+            background: "var(--color-surface)",
+            borderColor: "var(--color-border)",
+            borderRadius: 4,
+            color: "var(--color-text)",
+          }}
+        >
+          {e}
+        </li>
+      ))}
+    </ul>
   );
 }
 

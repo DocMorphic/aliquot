@@ -2,22 +2,31 @@
 
 import { useState } from "react";
 import { useExperiment } from "@/hooks/use-experiment";
+import { useTheme } from "@/hooks/use-theme";
 import { useWindowManager } from "@/hooks/use-window-manager";
 import { SAMPLE_HYPOTHESES } from "@/content/sample-hypotheses";
 
 export function HypothesisWindow() {
-  const { runExperiment, status, hypothesis: activeHypothesis } = useExperiment();
+  const {
+    runExperiment,
+    status,
+    hypothesis: activeHypothesis,
+    refinement,
+  } = useExperiment();
+  const { currency } = useTheme();
   const { openWindow } = useWindowManager();
   const [text, setText] = useState("");
 
-  const isRunning = status !== "queued" && status !== "done" && status !== "failed";
+  const isRunning =
+    status !== "queued" && status !== "done" && status !== "failed" && status !== "needs_refinement";
+  const showRefinement = status === "needs_refinement" && refinement !== null;
 
   async function handleRun(submitted: string) {
     const value = submitted.trim();
     if (!value || isRunning) return;
     openWindow("lit-qc");
     openWindow("plan");
-    await runExperiment(value);
+    await runExperiment(value, { currency });
   }
 
   return (
@@ -44,7 +53,7 @@ export function HypothesisWindow() {
         className="w-full resize-none border p-3 text-[13px] outline-none transition-colors"
         style={{
           background: "var(--color-input-bg)",
-          borderColor: "var(--color-input-border)",
+          borderColor: showRefinement ? "var(--color-warn)" : "var(--color-input-border)",
           color: "var(--color-text)",
           borderRadius: 6,
           minHeight: 120,
@@ -58,6 +67,62 @@ export function HypothesisWindow() {
           }
         }}
       />
+
+      {showRefinement && refinement && (
+        <div
+          className="border p-3"
+          style={{
+            background: "rgba(180, 83, 9, 0.06)",
+            borderColor: "var(--color-warn)",
+            borderRadius: 6,
+          }}
+        >
+          <div
+            className="text-[10.5px] font-semibold tracking-wider"
+            style={{ color: "var(--color-warn)" }}
+          >
+            REFINE YOUR HYPOTHESIS
+          </div>
+          <p
+            className="mt-1 text-[12.5px]"
+            style={{ color: "var(--color-text-secondary)", lineHeight: 1.5 }}
+          >
+            {refinement.reason}
+          </p>
+          {refinement.suggestions.length > 0 && (
+            <div className="mt-2.5 space-y-1.5">
+              <div
+                className="text-[10.5px] font-semibold tracking-wider"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                TRY ONE OF THESE
+              </div>
+              {refinement.suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => setText(s)}
+                  className="block w-full border p-2 text-left text-[12px] transition-colors"
+                  style={{
+                    background: "var(--color-surface)",
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-text)",
+                    borderRadius: 4,
+                    lineHeight: 1.5,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "var(--color-accent)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--color-border)";
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <div
@@ -110,10 +175,12 @@ export function HypothesisWindow() {
               />
               Running… edit and re-run anytime.
             </>
+          ) : showRefinement ? (
+            <>Pick a refined hypothesis above, or edit and try again.</>
           ) : activeHypothesis ? (
             <>Done. Edit and submit again to re-run.</>
           ) : (
-            <>Tip: ⌘+Enter to run.</>
+            <>Tip: ⌘+Enter to run · Currency: {currency}</>
           )}
         </div>
         <button

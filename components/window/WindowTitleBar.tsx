@@ -57,7 +57,7 @@ export function WindowTitleBar({
           onClick={onClose}
           aria-label="Close"
         >
-          <svg width="6" height="6" viewBox="0 0 6 6">
+          <svg width="8" height="8" viewBox="0 0 6 6">
             <line x1="1" y1="1" x2="5" y2="5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
             <line x1="5" y1="1" x2="1" y2="5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
           </svg>
@@ -69,7 +69,7 @@ export function WindowTitleBar({
             onClick={onMinimize}
             aria-label="Minimize"
           >
-            <svg width="6" height="6" viewBox="0 0 6 6">
+            <svg width="8" height="8" viewBox="0 0 6 6">
               <line x1="1" y1="3" x2="5" y2="3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
             </svg>
           </button>
@@ -81,7 +81,7 @@ export function WindowTitleBar({
             onClick={onMaximize}
             aria-label={isMaximized ? "Restore" : "Maximize"}
           >
-            <svg width="6" height="6" viewBox="0 0 6 6">
+            <svg width="8" height="8" viewBox="0 0 6 6">
               <polygon points="0,5 5,5 5,0" fill="currentColor" />
             </svg>
           </button>

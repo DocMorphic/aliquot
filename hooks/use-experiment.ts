@@ -9,6 +9,11 @@ import type {
   PipelineEvent,
 } from "@/lib/types";
 
+interface RefinementState {
+  reason: string;
+  suggestions: string[];
+}
+
 interface ExperimentState {
   experimentId: string | null;
   hypothesis: string;
@@ -17,11 +22,16 @@ interface ExperimentState {
   novelty: Novelty | null;
   references: Reference[];
   plan: ExperimentPlan | null;
+  refinement: RefinementState | null;
   error: string | null;
 }
 
+export interface RunOptions {
+  currency?: "USD" | "EUR" | "GBP";
+}
+
 interface ExperimentContextValue extends ExperimentState {
-  runExperiment: (hypothesis: string) => Promise<void>;
+  runExperiment: (hypothesis: string, options?: RunOptions) => Promise<void>;
   reset: () => void;
 }
 
@@ -33,6 +43,7 @@ const initialState: ExperimentState = {
   novelty: null,
   references: [],
   plan: null,
+  refinement: null,
   error: null,
 };
 
@@ -50,69 +61,74 @@ export function useExperimentProvider(): ExperimentContextValue {
   const [state, setState] = useState<ExperimentState>(initialState);
   const abortRef = useRef<AbortController | null>(null);
 
-  const runExperiment = useCallback(async (hypothesis: string) => {
-    if (!hypothesis.trim()) return;
+  const runExperiment = useCallback(
+    async (hypothesis: string, options: RunOptions = {}) => {
+      if (!hypothesis.trim()) return;
 
-    abortRef.current?.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
 
-    setState({
-      ...initialState,
-      hypothesis,
-      status: "classifying",
-      stageMessage: "Identifying scientific domain…",
-    });
-
-    try {
-      const res = await fetch("/api/experiment/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hypothesis }),
-        signal: ctrl.signal,
+      setState({
+        ...initialState,
+        hypothesis,
+        status: "validating",
+        stageMessage: "Checking hypothesis specificity…",
       });
 
-      if (!res.ok || !res.body) {
-        throw new Error(`Pipeline failed: ${res.status}`);
-      }
+      try {
+        const res = await fetch("/api/experiment/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hypothesis,
+            currency: options.currency ?? "USD",
+          }),
+          signal: ctrl.signal,
+        });
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+        if (!res.ok || !res.body) {
+          throw new Error(`Pipeline failed: ${res.status}`);
+        }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-        // Parse SSE events: separated by \n\n, each line prefixed with "data: "
-        const events = buffer.split("\n\n");
-        buffer = events.pop() ?? "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
 
-        for (const evt of events) {
-          const dataLines = evt
-            .split("\n")
-            .filter((l) => l.startsWith("data: "))
-            .map((l) => l.slice(6));
-          if (dataLines.length === 0) continue;
-          const payload = dataLines.join("\n");
-          try {
-            const parsed = JSON.parse(payload) as PipelineEvent;
-            applyEvent(parsed, setState);
-          } catch {
-            // ignore malformed events
+          const events = buffer.split("\n\n");
+          buffer = events.pop() ?? "";
+
+          for (const evt of events) {
+            const dataLines = evt
+              .split("\n")
+              .filter((l) => l.startsWith("data: "))
+              .map((l) => l.slice(6));
+            if (dataLines.length === 0) continue;
+            const payload = dataLines.join("\n");
+            try {
+              const parsed = JSON.parse(payload) as PipelineEvent;
+              applyEvent(parsed, setState);
+            } catch {
+              // ignore malformed events
+            }
           }
         }
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") return;
+        setState((prev) => ({
+          ...prev,
+          status: "failed",
+          error: (err as Error).message ?? "Pipeline error",
+        }));
       }
-    } catch (err) {
-      if ((err as Error)?.name === "AbortError") return;
-      setState((prev) => ({
-        ...prev,
-        status: "failed",
-        error: (err as Error).message ?? "Pipeline error",
-      }));
-    }
-  }, []);
+    },
+    []
+  );
 
   const reset = useCallback(() => {
     abortRef.current?.abort();
@@ -156,6 +172,14 @@ function applyEvent(
         experimentId: event.experimentId,
         status: "done",
         stageMessage: "Plan ready",
+      }));
+      break;
+    case "needs_refinement":
+      setState((prev) => ({
+        ...prev,
+        status: "needs_refinement",
+        stageMessage: "Hypothesis needs refinement",
+        refinement: { reason: event.reason, suggestions: event.suggestions },
       }));
       break;
     case "error":

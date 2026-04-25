@@ -75,6 +75,14 @@
   --color-close-btn-hover: #ef4444;
 }
 
+/* Accent variants — switched via [data-accent] on <html> */
+[data-accent="blue"]   { --color-accent: #1E40AF; --color-link: #1E40AF; }
+[data-accent="teal"]   { --color-accent: #0F766E; --color-link: #0F766E; }
+[data-accent="purple"] { --color-accent: #6D28D9; --color-link: #6D28D9; }
+[data-theme="dark"][data-accent="blue"]   { --color-accent: #60a5fa; --color-link: #60a5fa; }
+[data-theme="dark"][data-accent="teal"]   { --color-accent: #2dd4bf; --color-link: #2dd4bf; }
+[data-theme="dark"][data-accent="purple"] { --color-accent: #c4b5fd; --color-link: #c4b5fd; }
+
 [data-theme="dark"] {
   --color-bg: #0c0a09;
   --color-surface: #1c1917;
@@ -201,11 +209,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: var(--color-close-btn);
   color: transparent;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.12s, color 0.12s, transform 0.08s;
   cursor: pointer;
   border: none;
   border-radius: 50%;
@@ -213,6 +221,11 @@ body {
 
 .window-control-btn:hover {
   color: rgba(0, 0, 0, 0.55);
+  transform: scale(1.1);
+}
+
+.window-control-btn:active {
+  transform: scale(0.95);
 }
 
 .window-control-btn.maximize {

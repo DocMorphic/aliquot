@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * values.
  */
 export async function POST(req: NextRequest) {
-  let body: { hypothesis?: string };
+  let body: { hypothesis?: string; currency?: "USD" | "EUR" | "GBP" };
   try {
     body = await req.json();
   } catch {
@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
       { status: 400, headers: { "content-type": "application/json" } }
     );
   }
+  const currency: "USD" | "EUR" | "GBP" =
+    body.currency === "EUR" || body.currency === "GBP" ? body.currency : "USD";
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
       try {
-        for await (const event of runPipeline(hypothesis)) {
+        for await (const event of runPipeline(hypothesis, { currency })) {
           send(event);
         }
       } catch (err) {
