@@ -6,11 +6,11 @@ import { getRecentCorrections } from "@/lib/supabase/corrections";
 import type { Domain, ExperimentPlan, Reference } from "@/lib/types";
 import { extractJson } from "../json";
 
-// Cap turns aggressively — each turn is one Sonnet round trip + tool
-// calls. With 4 turns the model can: get_corrections, search_catalog
-// (batched, ~6-8 reagents), one search_protocols if needed, then
-// submit_plan. Keeps us within the Vercel 60s SSE budget.
-const MAX_TOOL_TURNS = 4;
+// Cap turns aggressively to fit Phase 2 inside the Vercel Hobby 60s.
+// Three turns is enough for: (1) get_corrections + search_catalog
+// (batched), (2) optional follow-up search_catalog for missing items,
+// (3) submit_plan.
+const MAX_TOOL_TURNS = 3;
 
 const SYSTEM = `You are a senior PI drafting a complete, operationally realistic experiment plan.
 

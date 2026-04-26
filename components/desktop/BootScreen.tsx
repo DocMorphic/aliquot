@@ -1,77 +1,95 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
-const BOOT_LINES = [
-  "loading kernel ............ ok",
-  "mounting /experiments ..... ok",
-  "starting window manager ... ok",
-  "initializing pipeline ..... ok",
-  "aliquot@lab:~$ ready",
-];
+const TOTAL_DURATION_MS = 900;
+const FADE_OUT_DELAY_MS = 600;
 
-const LINE_STAGGER_MS = 120;
-const FADE_DELAY_MS = BOOT_LINES.length * LINE_STAGGER_MS + 400;
-
+/**
+ * Boot screen — a clean centered wordmark + tagline that fades in,
+ * holds briefly, then fades out. Replaces the previous terminal-style
+ * scrolling boot lines (dark + busy) with something quieter and
+ * on-brand. Total time on screen ~900ms.
+ */
 export function BootScreen() {
-  const [visible, setVisible] = useState(true);
-  const [linesShown, setLinesShown] = useState(0);
+  const [stage, setStage] = useState<"in" | "hold" | "out" | "gone">("in");
 
   useEffect(() => {
-    const lineTimers = BOOT_LINES.map((_, i) =>
-      setTimeout(() => setLinesShown(i + 1), i * LINE_STAGGER_MS + 100)
-    );
-    const unmountTimer = setTimeout(() => setVisible(false), FADE_DELAY_MS + 500);
+    const t1 = setTimeout(() => setStage("hold"), 180);
+    const t2 = setTimeout(() => setStage("out"), FADE_OUT_DELAY_MS);
+    const t3 = setTimeout(() => setStage("gone"), TOTAL_DURATION_MS);
     return () => {
-      lineTimers.forEach(clearTimeout);
-      clearTimeout(unmountTimer);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
     };
   }, []);
 
-  if (!visible) return null;
+  if (stage === "gone") return null;
+
+  const opacity = stage === "in" ? 0 : stage === "out" ? 0 : 1;
 
   return (
     <div
-      className="boot-screen fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
-      style={{ background: "#0c0a09" }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{
+        background: "var(--color-bg)",
+        opacity,
+        transition:
+          stage === "in"
+            ? "opacity 0.3s ease-out"
+            : stage === "out"
+            ? "opacity 0.3s ease-in"
+            : "none",
+        pointerEvents: stage === "out" ? "none" : "auto",
+      }}
       aria-live="polite"
       aria-label="Loading workspace"
     >
-      <div className="flex flex-col items-start gap-1 font-mono text-[13px]" style={{ color: "#a8a29e" }}>
+      <div className="flex flex-col items-center gap-3">
+        {/* Pipette mark — same as the favicon, larger */}
         <div
-          className="font-display mb-4 text-[22px]"
-          style={{ color: "#fafaf9", fontWeight: 500, letterSpacing: "-0.01em" }}
+          className="flex h-14 w-14 items-center justify-center"
+          style={{
+            background: "var(--color-accent)",
+            borderRadius: 14,
+            transform: stage === "in" ? "scale(0.9)" : "scale(1)",
+            transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+          aria-hidden
+        >
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect x="13.5" y="5.5" width="5" height="2" rx="0.5" fill="#fff" />
+            <rect x="14.25" y="7.5" width="3.5" height="11.5" fill="#fff" />
+            <path d="M14.25 19 L13 22 L19 22 L17.75 19 Z" fill="#fff" />
+            <path
+              d="M16 23.5 C 13.5 26 13.5 28.5 16 28.5 C 18.5 28.5 18.5 26 16 23.5 Z"
+              fill="#fff"
+            />
+          </svg>
+        </div>
+        {/* Wordmark in Fraunces */}
+        <div
+          className="font-display text-[34px]"
+          style={{
+            color: "var(--color-text)",
+            fontWeight: 500,
+            letterSpacing: "-0.025em",
+            transform: stage === "in" ? "translateY(6px)" : "translateY(0)",
+            transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
         >
           Aliquot
-          <span style={{ color: "#60a5fa", marginLeft: 10, fontFamily: "system-ui" }}>·</span>
-          <span
-            style={{ color: "#78716c", marginLeft: 10, fontFamily: "system-ui", fontSize: 13 }}
-          >
-            The AI Scientist
-          </span>
         </div>
-        {BOOT_LINES.map((line, i) => {
-          const shown = i < linesShown;
-          return (
-            <div
-              key={i}
-              className="flex items-start"
-              style={{
-                opacity: shown ? 1 : 0,
-                transform: shown ? "translateY(0)" : "translateY(2px)",
-                transition: "opacity 0.15s ease-out, transform 0.15s ease-out",
-              }}
-            >
-              <span style={{ color: "#60a5fa", marginRight: 8 }}>›</span>
-              <span>{line}</span>
-              {i === BOOT_LINES.length - 1 && shown && (
-                <span className="cursor-blink ml-1" style={{ color: "#60a5fa" }}>
-                  ▍
-                </span>
-              )}
-            </div>
-          );
-        })}
+        <div
+          className="text-[12px]"
+          style={{
+            color: "var(--color-text-muted)",
+            letterSpacing: "0.04em",
+          }}
+        >
+          The AI Scientist
+        </div>
       </div>
     </div>
   );

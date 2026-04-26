@@ -169,6 +169,12 @@ export interface Correction {
 export type PipelineEvent =
   | { type: "stage"; stage: ExperimentStatus; message: string }
   | { type: "lit_qc"; novelty: Novelty; references: Reference[] }
+  | {
+      type: "experiment_started";
+      experimentId: string;
+      hypothesis: string;
+      domain: Domain;
+    }
   | { type: "plan_partial"; plan: Partial<ExperimentPlan> }
   | { type: "plan_done"; plan: ExperimentPlan; experimentId: string }
   | { type: "needs_refinement"; reason: string; suggestions: string[] }

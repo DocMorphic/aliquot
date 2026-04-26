@@ -131,20 +131,7 @@ export function PlanWindow() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {isPending && (
-          <div
-            className="shrink-0 border-b px-5 py-2.5 text-[11.5px]"
-            style={{
-              background: "var(--color-info-box)",
-              borderColor: "var(--color-border)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            <span
-              className="mr-2 inline-block h-1.5 w-1.5 rounded-full animate-pulse"
-              style={{ background: "var(--color-accent)" }}
-            />
-            {stageMessage || STAGE_LABELS[status] || "Working…"}
-          </div>
+          <PipelineProgress status={status} stageMessage={stageMessage} />
         )}
 
         <div className="custom-scrollbar flex-1 overflow-y-auto px-5 py-4">
@@ -791,5 +778,107 @@ function EmptyOrSkeleton({ pending, hint }: { pending: boolean; hint: string }) 
     <p className="text-[12.5px]" style={{ color: "var(--color-text-muted)" }}>
       {hint}
     </p>
+  );
+}
+
+// === Pipeline progress timeline ===
+//
+// A horizontal stepper rendered above the plan content while a run is
+// in flight. Six stages, each shown as a labeled pill that goes from
+// pending → active (pulsing) → done. Replaces the single-line status
+// banner with something the user can actually use to gauge progress.
+
+const PIPELINE_STAGES: { key: string; label: string }[] = [
+  { key: "validating", label: "Validate" },
+  { key: "classifying", label: "Classify" },
+  { key: "lit_qc", label: "Literature" },
+  { key: "generating", label: "Generate" },
+  { key: "verifying", label: "Verify" },
+  { key: "scoring", label: "Score" },
+];
+
+function PipelineProgress({
+  status,
+  stageMessage,
+}: {
+  status: string;
+  stageMessage: string;
+}) {
+  const activeIndex = PIPELINE_STAGES.findIndex((s) => s.key === status);
+  return (
+    <div
+      className="shrink-0 border-b px-5 py-3"
+      style={{
+        background: "var(--color-info-box)",
+        borderColor: "var(--color-border)",
+      }}
+    >
+      <div className="flex items-center gap-1">
+        {PIPELINE_STAGES.map((stage, i) => {
+          const isDone = activeIndex > i;
+          const isActive = activeIndex === i;
+          // If we're past the last stage, mark all as done.
+          const treatAsDone = activeIndex === -1 && status === "done" ? true : isDone;
+          return (
+            <div key={stage.key} className="flex flex-1 items-center gap-1.5">
+              <span
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px]"
+                style={{
+                  background: treatAsDone
+                    ? "var(--color-accent)"
+                    : isActive
+                    ? "var(--color-accent)"
+                    : "var(--color-surface-alt)",
+                  color: treatAsDone || isActive ? "white" : "var(--color-text-muted)",
+                  border: `1px solid ${
+                    treatAsDone || isActive ? "var(--color-accent)" : "var(--color-border)"
+                  }`,
+                  animation: isActive
+                    ? "pipeline-pulse 1.6s ease-in-out infinite"
+                    : undefined,
+                }}
+              >
+                {treatAsDone ? "✓" : i + 1}
+              </span>
+              <span
+                className="truncate text-[10.5px]"
+                style={{
+                  color: isActive
+                    ? "var(--color-text)"
+                    : treatAsDone
+                    ? "var(--color-text-secondary)"
+                    : "var(--color-text-muted)",
+                  fontWeight: isActive ? 500 : 400,
+                }}
+              >
+                {stage.label}
+              </span>
+              {i < PIPELINE_STAGES.length - 1 && (
+                <span
+                  className="h-px flex-1"
+                  style={{
+                    background: treatAsDone
+                      ? "var(--color-accent)"
+                      : "var(--color-border)",
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div
+        className="mt-2 text-[11px]"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        {stageMessage || "Working…"}
+      </div>
+      <style jsx>{`
+        @keyframes pipeline-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(30, 64, 175, 0.45); }
+          50% { box-shadow: 0 0 0 6px rgba(30, 64, 175, 0); }
+        }
+      `}</style>
+    </div>
   );
 }

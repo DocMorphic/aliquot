@@ -8,7 +8,7 @@ import {
 } from "@/hooks/use-window-manager";
 import { ExperimentContext, useExperimentProvider } from "@/hooks/use-experiment";
 import { ModalContext, useModalProvider } from "@/hooks/use-modal";
-import { useDesktopPins, type PinnedExperiment } from "@/hooks/use-desktop-pins";
+import { DesktopPinsContext, useDesktopPinsProvider } from "@/hooks/use-desktop-pins";
 import { BootScreen } from "./BootScreen";
 import { MenuBar } from "./MenuBar";
 import { Taskbar } from "./Taskbar";
@@ -41,7 +41,7 @@ export function Desktop() {
   const windowManager = useWindowManagerProvider();
   const experiment = useExperimentProvider();
   const modal = useModalProvider();
-  const desktopPins = useDesktopPins();
+  const desktopPins = useDesktopPinsProvider();
 
   // Auto-open the Hypothesis window so visitors immediately see the entry point.
   useEffect(() => {
@@ -122,6 +122,7 @@ export function Desktop() {
       <WindowManagerContext value={windowManager}>
         <ExperimentContext value={experiment}>
           <ModalContext value={modal}>
+            <DesktopPinsContext value={desktopPins}>
             <BootScreen />
             <div className="desktop-brightness relative h-dvh w-full select-none">
               <Wallpaper />
@@ -188,6 +189,7 @@ export function Desktop() {
                 />
               )}
             </div>
+            </DesktopPinsContext>
           </ModalContext>
         </ExperimentContext>
       </WindowManagerContext>

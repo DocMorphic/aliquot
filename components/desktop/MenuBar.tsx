@@ -37,7 +37,7 @@ export function MenuBar() {
     getFocusedAppId,
   } = useWindowManager();
   const { confirm } = useModal();
-  const { status, stageMessage, sessionSpend, runsThisSession } = useExperiment();
+  const { status, stageMessage, error, cancelExperiment } = useExperiment();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -207,9 +207,13 @@ export function MenuBar() {
       </div>
 
       <div className="flex items-stretch gap-3">
-        <PipelineStatus status={status} stageMessage={stageMessage} />
+        <PipelineStatus
+          status={status}
+          stageMessage={stageMessage}
+          onCancel={cancelExperiment}
+        />
 
-        <SessionSpend spend={sessionSpend} runs={runsThisSession} />
+        <ApiStatus errorMessage={error} status={status} />
 
         <div className="relative flex items-center">
           <DisplayButton
@@ -377,9 +381,11 @@ function DisplayButton({
 function PipelineStatus({
   status,
   stageMessage,
+  onCancel,
 }: {
   status: string;
   stageMessage: string;
+  onCancel: () => void;
 }) {
   const running = RUNNING_STATUSES.has(status);
   const label = running
@@ -412,6 +418,28 @@ function PipelineStatus({
       >
         {label}
       </span>
+      {running && (
+        <button
+          onClick={onCancel}
+          className="ml-1 rounded border px-1.5 text-[10.5px] transition-colors"
+          style={{
+            background: "transparent",
+            borderColor: "var(--color-border)",
+            color: "var(--color-error)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(185, 28, 28, 0.08)";
+            e.currentTarget.style.borderColor = "var(--color-error)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.borderColor = "var(--color-border)";
+          }}
+          title="Cancel running pipeline (aborts API calls)"
+        >
+          Cancel
+        </button>
+      )}
       <style jsx>{`
         @keyframes menu-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
@@ -422,18 +450,44 @@ function PipelineStatus({
   );
 }
 
-function SessionSpend({ spend, runs }: { spend: number; runs: number }) {
-  const formatted = `$${spend.toFixed(2)}`;
+/** Three small dots representing connection health for the external
+ *  services the pipeline depends on. Green by default; flips red if
+ *  the most recent run failed with a recognizable error message. */
+function ApiStatus({
+  errorMessage,
+  status,
+}: {
+  errorMessage: string | null;
+  status: string;
+}) {
+  const services: { key: string; label: string; pattern: RegExp }[] = [
+    { key: "anthropic", label: "Anthropic", pattern: /anthropic|claude|sonnet|haiku/i },
+    { key: "tavily", label: "Tavily", pattern: /tavily/i },
+    { key: "supabase", label: "Supabase", pattern: /supabase|postgres|RLS/i },
+  ];
+  const isFailed = status === "failed" && !!errorMessage;
   return (
     <span
-      className="flex items-center gap-1 text-[11.5px] tabular-nums"
-      style={{ color: "var(--color-menubar-text)" }}
-      title={`API spend this session — local estimate, resets on reload. ${runs} run${
-        runs === 1 ? "" : "s"
-      } so far.`}
+      className="flex items-center gap-1.5"
+      title="API health — green = ok, red = last failure mentioned this service"
     >
-      <span style={{ color: "var(--color-text-muted)" }}>session:</span>
-      <span style={{ fontWeight: 500 }}>{formatted}</span>
+      {services.map((s) => {
+        const broken = isFailed && s.pattern.test(errorMessage ?? "");
+        return (
+          <span
+            key={s.key}
+            className="inline-block h-2 w-2 rounded-full"
+            style={{
+              background: broken ? "var(--color-error)" : "var(--color-success)",
+              boxShadow: broken
+                ? "0 0 0 1px rgba(185,28,28,0.25)"
+                : "0 0 0 1px rgba(21,128,61,0.18)",
+            }}
+            aria-label={`${s.label}: ${broken ? "error" : "ok"}`}
+            title={`${s.label}: ${broken ? "last error mentioned this" : "ok"}`}
+          />
+        );
+      })}
     </span>
   );
 }

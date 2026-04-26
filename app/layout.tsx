@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, JetBrains_Mono, Fraunces } from "next/font/google";
+import { Manrope, JetBrains_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -10,9 +10,9 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// Body — Geist (Vercel's geometric grotesque). Replaces Inter; better
-// proportions for technical UI at small sizes.
-const geist = Geist({
+// Body — Manrope. Distinctive rounded geometric grotesque with notable
+// character at small sizes; visibly different from Inter/Geist.
+const manrope = Manrope({
   variable: "--font-sans",
   subsets: ["latin"],
   display: "swap",
@@ -71,7 +71,7 @@ export default function RootLayout({
       data-theme="light"
       data-accent="blue"
       suppressHydrationWarning
-      className={`${geist.variable} ${jetbrainsMono.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${manrope.variable} ${jetbrainsMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: FOUC_INIT_SCRIPT }} />
