@@ -12,6 +12,7 @@ export function HypothesisWindow() {
     status,
     hypothesis: activeHypothesis,
     refinement,
+    error,
   } = useExperiment();
   const { currency } = useTheme();
   const { openWindow } = useWindowManager();
@@ -20,6 +21,7 @@ export function HypothesisWindow() {
   const isRunning =
     status !== "queued" && status !== "done" && status !== "failed" && status !== "needs_refinement";
   const showRefinement = status === "needs_refinement" && refinement !== null;
+  const showError = status === "failed" && !!error;
 
   async function handleRun(submitted: string) {
     const value = submitted.trim();
@@ -67,6 +69,36 @@ export function HypothesisWindow() {
           }
         }}
       />
+
+      {showError && (
+        <div
+          className="border p-3"
+          style={{
+            background: "rgba(185, 28, 28, 0.06)",
+            borderColor: "var(--color-error)",
+            borderRadius: 6,
+          }}
+        >
+          <div
+            className="text-[10.5px] font-semibold tracking-wider"
+            style={{ color: "var(--color-error)" }}
+          >
+            PIPELINE FAILED
+          </div>
+          <p
+            className="mt-1 text-[12.5px]"
+            style={{ color: "var(--color-text)", lineHeight: 1.5 }}
+          >
+            {error}
+          </p>
+          <p
+            className="mt-2 text-[11.5px]"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Edit and re-run, or simplify the hypothesis (fewer reagents = faster generation).
+          </p>
+        </div>
+      )}
 
       {showRefinement && refinement && (
         <div

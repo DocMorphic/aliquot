@@ -8,10 +8,18 @@ import type { ExperimentPlan } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Phase 2 — generator only. Tightest budget. With MAX_TOOL_TURNS=2
-// the model batches all tool calls in turn 1 and submits on turn 2,
-// fitting the Vercel Hobby 60s cap with headroom.
-export const maxDuration = 60;
+// Generator can take 30-60s on biology hypotheses. Vercel Hobby
+// historically capped at 60s but Fluid Compute (default for
+// Next.js 15+) allows higher numbers on I/O-bound work; if Vercel
+// rejects 120 the build fails and we'll roll back. Combined with the
+// 50s in-process timeout below, a true Vercel-level kill should be
+// rare: we'd rather surface a clean app-level error than have the
+// runtime murder the function before the catch block runs.
+export const maxDuration = 120;
+
+// Internal hard limit. We Promise.race this against the generator so
+// the catch block always runs and the user gets a real error message.
+const GENERATOR_TIMEOUT_MS = 55_000;
 
 interface GenerateBody {
   currency?: "USD" | "EUR" | "GBP";
@@ -66,12 +74,23 @@ export async function POST(
     console.log(
       `[generate] start id=${id} domain=${exp.domain} hypothesis_len=${exp.hypothesis.length}`
     );
-    const draftPlan = await generatePlan(
-      exp.hypothesis,
-      exp.domain,
-      exp.references,
-      { currency }
-    );
+    // Race the generator against an in-process timeout so the catch
+    // block always runs (and we always log + return a real error
+    // before Vercel kills the function).
+    const draftPlan = await Promise.race([
+      generatePlan(exp.hypothesis, exp.domain, exp.references, { currency }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Generator exceeded ${GENERATOR_TIMEOUT_MS / 1000}s (in-process timeout — try a more specific hypothesis or upgrade Vercel to Pro)`
+              )
+            ),
+          GENERATOR_TIMEOUT_MS
+        )
+      ),
+    ]);
     const phase2Ms = Date.now() - startedAt;
     console.log(
       `[generate] done id=${id} duration_ms=${phase2Ms} materials=${draftPlan.materials.length} protocol_steps=${draftPlan.protocol.length}`

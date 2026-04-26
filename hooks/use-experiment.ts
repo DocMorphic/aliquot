@@ -153,7 +153,21 @@ export function useExperimentProvider(): ExperimentContextValue {
             signal: ctrl.signal,
           }
         );
-        if (!genRes.ok) throw new Error(`Generate HTTP ${genRes.status}`);
+        if (!genRes.ok) {
+          // Pull the structured error body so the UI can show the
+          // actual reason (e.g. "Generator exceeded 55s") + hint.
+          let detail: { error?: string; hint?: string; elapsedMs?: number } = {};
+          try {
+            detail = await genRes.json();
+          } catch {
+            // body was not JSON — fall back to status text
+          }
+          const msg =
+            detail.error ??
+            `Generate failed (HTTP ${genRes.status})`;
+          const fullMsg = detail.hint ? `${msg} · ${detail.hint}` : msg;
+          throw new Error(fullMsg);
+        }
         const gen = (await genRes.json()) as { plan: ExperimentPlan };
         setState((prev) => ({
           ...prev,
@@ -168,7 +182,23 @@ export function useExperimentProvider(): ExperimentContextValue {
           `/api/experiment/${experimentStarted.experimentId}/verify`,
           { method: "POST", signal: ctrl.signal }
         );
-        if (!verifyRes.ok) throw new Error(`Verify HTTP ${verifyRes.status}`);
+        if (!verifyRes.ok) {
+          // Verify is non-critical — the user already has a plan from
+          // Phase 2. Log the error but settle to "done" so the UI
+          // doesn't bounce to a failed state.
+          console.warn(`[verify] HTTP ${verifyRes.status} — continuing without verification`);
+          setState((prev) => {
+            if (!prev.plan) return prev;
+            return {
+              ...prev,
+              plan: { ...prev.plan, verificationPending: false },
+              status: "done",
+              stageMessage: "Plan ready (verification skipped)",
+              runsThisSession: prev.runsThisSession + 1,
+            };
+          });
+          return;
+        }
         const verified = (await verifyRes.json()) as { plan: ExperimentPlan };
         setState((prev) => ({
           ...prev,
