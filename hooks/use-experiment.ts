@@ -101,6 +101,10 @@ export function useExperimentProvider(): ExperimentContextValue {
         stageMessage: "Checking hypothesis specificity…",
       }));
 
+      // Hoisted so the catch block can reach it for cancellation cleanup
+      // (delete the partial row on Supabase).
+      let experimentStarted: { experimentId: string; domain: Domain } | null = null;
+
       try {
         // === Phase 1: SSE — validator + classifier + lit_qc ===
         const res = await fetch("/api/experiment/run", {
@@ -120,7 +124,6 @@ export function useExperimentProvider(): ExperimentContextValue {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let experimentStarted: { experimentId: string; domain: Domain } | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -232,13 +235,32 @@ export function useExperimentProvider(): ExperimentContextValue {
         }));
       } catch (err) {
         if ((err as Error)?.name === "AbortError") {
-          // Cancellation — leave state where the user stopped, but mark
-          // as failed so the UI knows to show "cancelled".
-          setState((prev) => ({
-            ...prev,
-            status: prev.plan ? "done" : "failed",
-            stageMessage: prev.plan ? "Plan ready (cancelled mid-verify)" : "Cancelled",
-          }));
+          // Cancellation. Two cases:
+          //  1. No plan was produced yet → the in-flight experiment is
+          //     half-baked. Delete the row from Supabase (fire-and-
+          //     forget) and reset the UI to idle. The Library will
+          //     reload because we transition status back to "queued".
+          //  2. A plan exists (cancelled mid-verify) → that's a usable
+          //     result, keep the experiment + mark it done.
+          setState((prev) => {
+            if (!prev.plan) {
+              const idToDelete =
+                prev.experimentId ?? experimentStarted?.experimentId ?? null;
+              if (idToDelete) {
+                void fetch(`/api/experiments/${idToDelete}`, {
+                  method: "DELETE",
+                }).catch(() => {});
+              }
+              // Preserve only the cumulative session counter — clear
+              // hypothesis, plan, references, etc.
+              return { ...initialState, runsThisSession: prev.runsThisSession };
+            }
+            return {
+              ...prev,
+              status: "done",
+              stageMessage: "Plan ready (cancelled mid-verify)",
+            };
+          });
           return;
         }
         setState((prev) => ({

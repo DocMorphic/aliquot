@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useExperiment } from "@/hooks/use-experiment";
 import { useWindowManager } from "@/hooks/use-window-manager";
 import { useModal } from "@/hooks/use-modal";
@@ -55,6 +55,17 @@ export function LibraryApp() {
       void load();
     }
   }, [status, experimentId, load]);
+
+  // Reload when the experiment context resets back to idle — e.g.
+  // after the user cancels a half-baked pipeline and we delete the
+  // partial row from Supabase.
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (prevStatusRef.current !== "queued" && status === "queued") {
+      void load();
+    }
+    prevStatusRef.current = status;
+  }, [status, load]);
 
   const handleLoadIntoPlan = useCallback(
     async (id: string) => {
