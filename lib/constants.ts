@@ -21,7 +21,7 @@ export const APP_REGISTRY: Record<string, AppDefinition> = {
     title: "Hypothesis",
     icon: "🧪",
     defaultWidth: 620,
-    defaultHeight: 460,
+    defaultHeight: 540,
     defaultX: 60,
     defaultY: 80,
     showInExplorer: true,

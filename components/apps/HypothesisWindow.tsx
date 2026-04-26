@@ -142,21 +142,13 @@ export function HypothesisWindow() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
-      <div>
-        <h2
-          className="text-[18px]"
-          style={{ fontWeight: 600, letterSpacing: "-0.01em" }}
-        >
-          What scientific question do you want to test?
-        </h2>
-        <p
-          className="mt-1 text-[12.5px]"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          State a specific intervention, a measurable outcome with a threshold, a mechanism, and an implied control.
-        </p>
-      </div>
+    <div className="flex h-full flex-col gap-3">
+      <h2
+        className="text-[16px]"
+        style={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+      >
+        What scientific question do you want to test?
+      </h2>
 
       <textarea
         value={text}
@@ -168,10 +160,10 @@ export function HypothesisWindow() {
           borderColor: showRefinement ? "var(--color-warn)" : "var(--color-input-border)",
           color: "var(--color-text)",
           borderRadius: 6,
-          minHeight: 120,
+          minHeight: 90,
           fontFamily: "inherit",
         }}
-        rows={6}
+        rows={4}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
             e.preventDefault();
@@ -212,15 +204,6 @@ export function HypothesisWindow() {
 
       <div>
         <div
-          className="mb-1.5 flex items-baseline justify-between text-[10.5px] font-semibold tracking-wider"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          <span>ATTACHED CONTEXT (OPTIONAL)</span>
-          <span style={{ fontWeight: 400, fontSize: 10 }}>
-            PDF · image · TXT/MD/CSV/JSON · 4MB · max 3
-          </span>
-        </div>
-        <div
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -232,7 +215,7 @@ export function HypothesisWindow() {
             if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
           }}
           onClick={() => fileInputRef.current?.click()}
-          className="cursor-pointer border border-dashed px-3 py-2.5 text-[11.5px] transition-colors"
+          className="cursor-pointer border border-dashed px-3 py-2 text-[11.5px] transition-colors"
           style={{
             background: dragOver
               ? "rgba(30, 64, 175, 0.06)"
@@ -245,9 +228,12 @@ export function HypothesisWindow() {
           }}
         >
           {pendingFiles.length === 0 ? (
-            <>
-              Drop a paper, image, dataset, or notes here — the AI will read it as context for the plan.
-            </>
+            <span>
+              📎 Drop a paper, image, or dataset for AI context
+              <span style={{ color: "var(--color-text-muted)", fontSize: 10, marginLeft: 6 }}>
+                PDF · image · TXT/CSV · 4MB · max 3
+              </span>
+            </span>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {pendingFiles.map((f) => {
@@ -467,13 +453,13 @@ export function HypothesisWindow() {
       )}
 
       <div>
-        <div
-          className="mb-2 text-[10.5px] font-semibold tracking-wider"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          QUICK START — SAMPLE HYPOTHESES
-        </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className="text-[10.5px] font-semibold tracking-wider"
+            style={{ color: "var(--color-text-muted)", marginRight: 4 }}
+          >
+            OR TRY
+          </span>
           {SAMPLE_HYPOTHESES.map((s) => (
             <button
               key={s.id}
@@ -505,8 +491,7 @@ export function HypothesisWindow() {
       </div>
 
       <div
-        className="mt-auto flex items-center justify-between border-t pt-3"
-        style={{ borderColor: "var(--color-border)" }}
+        className="mt-auto flex items-center justify-between pt-2"
       >
         <div className="text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>
           {isRunning ? (
