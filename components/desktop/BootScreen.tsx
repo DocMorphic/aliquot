@@ -2,95 +2,178 @@
 
 import { useEffect, useState } from "react";
 
-const TOTAL_DURATION_MS = 900;
-const FADE_OUT_DELAY_MS = 600;
+const TOTAL_DURATION_MS = 1700;
+const FADE_OUT_DELAY_MS = 1400;
 
 /**
- * Boot screen — a clean centered wordmark + tagline that fades in,
- * holds briefly, then fades out. Replaces the previous terminal-style
- * scrolling boot lines (dark + busy) with something quieter and
- * on-brand. Total time on screen ~900ms.
+ * Boot screen — animated pipette drop sequence.
+ *
+ * Visual story (~1.7s total):
+ *   1. Dark lab background fades in instantly.
+ *   2. A pipette stem draws itself in (top → bottom) using SVG
+ *      stroke-dasharray animation.
+ *   3. A liquid bulb fills inside the pipette, then a single drop
+ *      detaches and falls.
+ *   4. The drop lands, ripples expand outward over a faint surface
+ *      line.
+ *   5. The Aliquot wordmark fades in beside the ripple.
+ *   6. Whole screen fades out.
+ *
+ * No external assets — everything is inline SVG so it loads
+ * instantly with no FOUC. The screen unmounts after the fade-out
+ * completes so it doesn't intercept clicks afterwards.
  */
 export function BootScreen() {
-  const [stage, setStage] = useState<"in" | "hold" | "out" | "gone">("in");
+  const [unmounted, setUnmounted] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStage("hold"), 180);
-    const t2 = setTimeout(() => setStage("out"), FADE_OUT_DELAY_MS);
-    const t3 = setTimeout(() => setStage("gone"), TOTAL_DURATION_MS);
+    const t1 = setTimeout(() => setFadeOut(true), FADE_OUT_DELAY_MS);
+    const t2 = setTimeout(() => setUnmounted(true), TOTAL_DURATION_MS);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      clearTimeout(t3);
     };
   }, []);
 
-  if (stage === "gone") return null;
-
-  const opacity = stage === "in" ? 0 : stage === "out" ? 0 : 1;
+  if (unmounted) return null;
 
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{
-        background: "var(--color-bg)",
-        opacity,
-        transition:
-          stage === "in"
-            ? "opacity 0.3s ease-out"
-            : stage === "out"
-            ? "opacity 0.3s ease-in"
-            : "none",
-        pointerEvents: stage === "out" ? "none" : "auto",
+        background: "#0c0a09",
+        opacity: fadeOut ? 0 : 1,
+        transition: "opacity 0.3s ease-in",
+        pointerEvents: fadeOut ? "none" : "auto",
       }}
       aria-live="polite"
       aria-label="Loading workspace"
     >
-      <div className="flex flex-col items-center gap-3">
-        {/* Pipette mark — same as the favicon, larger */}
-        <div
-          className="flex h-14 w-14 items-center justify-center"
-          style={{
-            background: "var(--color-accent)",
-            borderRadius: 14,
-            transform: stage === "in" ? "scale(0.9)" : "scale(1)",
-            transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-          }}
+      {/* Single SVG canvas — pipette + drop + surface + ripples */}
+      <div className="flex flex-col items-center gap-5">
+        <svg
+          width="120"
+          height="180"
+          viewBox="0 0 120 180"
+          fill="none"
           aria-hidden
         >
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <rect x="13.5" y="5.5" width="5" height="2" rx="0.5" fill="#fff" />
-            <rect x="14.25" y="7.5" width="3.5" height="11.5" fill="#fff" />
-            <path d="M14.25 19 L13 22 L19 22 L17.75 19 Z" fill="#fff" />
-            <path
-              d="M16 23.5 C 13.5 26 13.5 28.5 16 28.5 C 18.5 28.5 18.5 26 16 23.5 Z"
-              fill="#fff"
+          {/* Pipette outer stroke — draws itself in (0 → 1.0) */}
+          <path
+            d="M 51 12 L 69 12 M 51 12 L 51 95 Q 51 100 53 102 L 60 130 L 67 102 Q 69 100 69 95 L 69 12"
+            stroke="#60a5fa"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+            style={{
+              strokeDasharray: 320,
+              strokeDashoffset: 320,
+              animation: "draw 0.55s ease-out 0.1s forwards",
+            }}
+          />
+          {/* Liquid bulb fills in after the stroke completes */}
+          <path
+            d="M 53 70 L 53 95 Q 53 99 54.5 101 L 60 122 L 65.5 101 Q 67 99 67 95 L 67 70 Z"
+            fill="#1E40AF"
+            style={{
+              transformOrigin: "60px 122px",
+              transform: "scaleY(0)",
+              animation: "fill 0.45s ease-out 0.55s forwards",
+            }}
+          />
+          {/* Falling drop — emerges at the tip, drops to the surface */}
+          <ellipse
+            cx="60"
+            cy="132"
+            rx="3.5"
+            ry="4.5"
+            fill="#60a5fa"
+            style={{
+              opacity: 0,
+              animation: "drop 0.6s cubic-bezier(0.4, 0, 0.7, 1) 1s forwards",
+            }}
+          />
+          {/* Surface line */}
+          <line
+            x1="20"
+            y1="156"
+            x2="100"
+            y2="156"
+            stroke="#3b3a39"
+            strokeWidth="1"
+            style={{
+              strokeDasharray: 80,
+              strokeDashoffset: 80,
+              animation: "draw 0.4s ease-out 0.9s forwards",
+            }}
+          />
+          {/* Ripples — three concentric circles fade out as they expand */}
+          {[0, 0.12, 0.24].map((delay, i) => (
+            <circle
+              key={i}
+              cx="60"
+              cy="156"
+              r="2"
+              stroke="#60a5fa"
+              strokeWidth="1.2"
+              fill="none"
+              style={{
+                opacity: 0,
+                animation: `ripple 0.7s ease-out ${1.4 + delay}s forwards`,
+              }}
             />
-          </svg>
-        </div>
-        {/* Wordmark in Fraunces */}
+          ))}
+        </svg>
+
         <div
-          className="font-display text-[34px]"
+          className="flex flex-col items-center gap-1.5"
           style={{
-            color: "var(--color-text)",
-            fontWeight: 500,
-            letterSpacing: "-0.025em",
-            transform: stage === "in" ? "translateY(6px)" : "translateY(0)",
-            transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+            opacity: 0,
+            animation: "wordmark-in 0.45s ease-out 1.15s forwards",
           }}
         >
-          Aliquot
-        </div>
-        <div
-          className="text-[12px]"
-          style={{
-            color: "var(--color-text-muted)",
-            letterSpacing: "0.04em",
-          }}
-        >
-          The AI Scientist
+          <div
+            className="font-display text-[28px]"
+            style={{
+              color: "#fafaf9",
+              fontWeight: 500,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Aliquot
+          </div>
+          <div
+            className="text-[10.5px] uppercase tracking-[0.18em]"
+            style={{ color: "#78716c" }}
+          >
+            The AI Scientist
+          </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes draw {
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes fill {
+          to { transform: scaleY(1); }
+        }
+        @keyframes drop {
+          0%   { opacity: 0; transform: translate(0, 0) scaleY(0.6); }
+          15%  { opacity: 1; transform: translate(0, 0) scaleY(1); }
+          100% { opacity: 1; transform: translate(0, 24px) scaleY(1.3); }
+        }
+        @keyframes ripple {
+          0%   { opacity: 0.6; r: 2; }
+          100% { opacity: 0; r: 30; }
+        }
+        @keyframes wordmark-in {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

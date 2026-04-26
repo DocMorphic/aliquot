@@ -8,8 +8,9 @@ import type { ExperimentPlan } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Phase 2 — generator only. Tightest budget. With MAX_TOOL_TURNS=3 and
-// the Sonnet generator, real biology hypotheses fit in ~30-45s.
+// Phase 2 — generator only. Tightest budget. With MAX_TOOL_TURNS=2
+// the model batches all tool calls in turn 1 and submits on turn 2,
+// fitting the Vercel Hobby 60s cap with headroom.
 export const maxDuration = 60;
 
 interface GenerateBody {
@@ -62,6 +63,9 @@ export async function POST(
   }
 
   try {
+    console.log(
+      `[generate] start id=${id} domain=${exp.domain} hypothesis_len=${exp.hypothesis.length}`
+    );
     const draftPlan = await generatePlan(
       exp.hypothesis,
       exp.domain,
@@ -69,6 +73,9 @@ export async function POST(
       { currency }
     );
     const phase2Ms = Date.now() - startedAt;
+    console.log(
+      `[generate] done id=${id} duration_ms=${phase2Ms} materials=${draftPlan.materials.length} protocol_steps=${draftPlan.protocol.length}`
+    );
 
     const planWithStats: ExperimentPlan = {
       ...draftPlan,
@@ -80,15 +87,35 @@ export async function POST(
       },
     };
 
-    await saveDraftPlan(id, planWithStats);
+    const persisted = await saveDraftPlan(id, planWithStats);
+    if (!persisted) {
+      console.warn(`[generate] saveDraftPlan failed id=${id}`);
+    }
 
     return new Response(JSON.stringify({ plan: planWithStats }), {
       status: 200,
       headers: { "content-type": "application/json", "cache-control": "no-store" },
     });
   } catch (err) {
+    const elapsed = Date.now() - startedAt;
+    const message = (err as Error).message ?? "generate failed";
+    const stack = (err as Error).stack;
+    // Verbose log so the failure shows up in Vercel runtime logs with
+    // enough context to debug — id, elapsed time (catch timeout), the
+    // error message, and a stack trace.
+    console.error(
+      `[generate] FAILED id=${id} elapsed_ms=${elapsed} error=${message}`,
+      stack
+    );
     return new Response(
-      JSON.stringify({ error: (err as Error).message ?? "generate failed" }),
+      JSON.stringify({
+        error: message,
+        elapsedMs: elapsed,
+        hint:
+          elapsed > 55000
+            ? "function timed out — generator took longer than the 60s Vercel Hobby cap"
+            : undefined,
+      }),
       { status: 500, headers: { "content-type": "application/json" } }
     );
   }

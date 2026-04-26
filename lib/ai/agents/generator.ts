@@ -6,11 +6,11 @@ import { getRecentCorrections } from "@/lib/supabase/corrections";
 import type { Domain, ExperimentPlan, Reference } from "@/lib/types";
 import { extractJson } from "../json";
 
-// Cap turns aggressively to fit Phase 2 inside the Vercel Hobby 60s.
-// Three turns is enough for: (1) get_corrections + search_catalog
-// (batched), (2) optional follow-up search_catalog for missing items,
-// (3) submit_plan.
-const MAX_TOOL_TURNS = 3;
+// Cap turns at 2 for Phase 2 to comfortably fit inside the Vercel
+// Hobby 60s function cap. Sonnet typically emits all needed tool calls
+// in a single response (turn 1: get_corrections + N parallel
+// search_catalog calls), then submits the plan on turn 2.
+const MAX_TOOL_TURNS = 2;
 
 const SYSTEM = `You are a senior PI drafting a complete, operationally realistic experiment plan.
 
