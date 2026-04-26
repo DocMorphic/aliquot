@@ -4,6 +4,8 @@ import type { Domain, Novelty, ExperimentPlan } from "@/lib/types";
 export interface ExperimentSummary {
   id: string;
   hypothesis: string;
+  /** User-chosen short label. Falls back to truncated hypothesis when null. */
+  title: string | null;
   domain: Domain | null;
   novelty: Novelty | null;
   createdAt: string;
@@ -23,6 +25,7 @@ interface PlansSummaryRow {
 interface ExperimentRow {
   id: string;
   hypothesis: string;
+  title: string | null;
   domain: Domain | null;
   novelty: Novelty | null;
   created_at: string;
@@ -45,7 +48,7 @@ export async function listRecentExperiments(limit = 20): Promise<ExperimentSumma
     const { data, error } = await sb
       .from("experiments")
       .select(
-        `id, hypothesis, domain, novelty, created_at,
+        `id, hypothesis, title, domain, novelty, created_at,
          plans!inner ( plan_json, confidence_summary )`
       )
       .order("created_at", { ascending: false })
@@ -58,6 +61,7 @@ export async function listRecentExperiments(limit = 20): Promise<ExperimentSumma
       return {
         id: row.id,
         hypothesis: row.hypothesis,
+        title: row.title ?? null,
         domain: row.domain,
         novelty: row.novelty,
         createdAt: row.created_at,

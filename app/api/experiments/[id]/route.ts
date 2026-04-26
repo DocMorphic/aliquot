@@ -120,6 +120,58 @@ export async function DELETE(
   }
 }
 
+/**
+ * PATCH /api/experiments/:id
+ *
+ * Updates the user-chosen display title. Sending `title: null` clears
+ * it, falling back to the truncated hypothesis. The hypothesis itself
+ * is intentionally read-only — it's the prompt the AI ran against.
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  if (!isUuid(id)) {
+    return new Response(JSON.stringify({ error: "invalid id" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  let body: { title?: string | null } = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+  const title: string | null | undefined =
+    body.title === null
+      ? null
+      : typeof body.title === "string"
+        ? body.title.trim().slice(0, 120) || null
+        : undefined;
+  if (title === undefined) {
+    return new Response(JSON.stringify({ error: "title required" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  try {
+    const sb = getServerSupabase();
+    const { error } = await sb.from("experiments").update({ title }).eq("id", id);
+    if (error) throw error;
+    return new Response(JSON.stringify({ ok: true, title }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: (err as Error).message ?? "Unknown error" }),
+      { status: 500, headers: { "content-type": "application/json" } }
+    );
+  }
+}
+
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }

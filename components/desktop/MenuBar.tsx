@@ -207,6 +207,20 @@ export function MenuBar() {
       </div>
 
       <div className="flex items-stretch gap-3">
+        <a
+          href="https://hack-nation.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center px-2 text-[11px] font-semibold transition-opacity hover:opacity-80"
+          style={{
+            color: "var(--color-text-muted)",
+            letterSpacing: "0.06em",
+          }}
+          title="Built for Hack-Nation × Fulcrum"
+        >
+          🚀 HACK-NATION
+        </a>
+
         <PipelineStatus
           status={status}
           stageMessage={stageMessage}

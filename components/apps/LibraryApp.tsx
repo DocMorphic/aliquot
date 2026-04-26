@@ -68,6 +68,28 @@ export function LibraryApp() {
     [loadFromHistory, openWindow, focusWindow]
   );
 
+  const handleRename = useCallback(
+    async (id: string, title: string | null) => {
+      // Optimistic update — the server-side PATCH is fire-and-forget
+      // for hackathon scope. If it fails the next refresh will revert.
+      setExperiments((prev) =>
+        prev?.map((e) => (e.id === id ? { ...e, title } : e)) ?? prev
+      );
+      try {
+        const res = await fetch(`/api/experiments/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (err) {
+        setLoadError(`Rename failed: ${(err as Error).message}`);
+        void load();
+      }
+    },
+    [load]
+  );
+
   const handleDelete = useCallback(
     async (id: string, hypothesisPreview: string) => {
       const preview =
@@ -114,7 +136,7 @@ export function LibraryApp() {
             Library
           </h3>
           <p className="mt-1 text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>
-            Recent experiments persisted in Supabase. Click to expand · click Load to open in Plan window.
+            Recent experiments persisted in Supabase. Click to expand · hover ✏️ to rename · drag onto desktop to pin.
           </p>
         </div>
         <button
@@ -167,6 +189,7 @@ export function LibraryApp() {
                 inMemoryPlan={e.id === experimentId ? plan : null}
                 onLoad={handleLoadIntoPlan}
                 onDelete={handleDelete}
+                onRename={handleRename}
               />
             ))}
           </ul>
@@ -223,13 +246,36 @@ interface ExperimentCardProps {
   inMemoryPlan: ExperimentPlan | null;
   onLoad: (id: string) => void;
   onDelete: (id: string, hypothesisPreview: string) => void;
+  onRename: (id: string, title: string | null) => void;
 }
 
-function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad, onDelete }: ExperimentCardProps) {
+function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad, onDelete, onRename }: ExperimentCardProps) {
   const [expanded, setExpanded] = useState(pinned);
   const [detail, setDetail] = useState<ExperimentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(exp.title ?? "");
+
+  const truncatedHypothesis =
+    exp.hypothesis.length > 140 ? exp.hypothesis.slice(0, 140) + "…" : exp.hypothesis;
+  const displayLabel = exp.title ?? truncatedHypothesis;
+  const hasTitle = exp.title !== null && exp.title.length > 0;
+
+  const commitRename = () => {
+    const next = draft.trim();
+    onRename(exp.id, next.length === 0 ? null : next);
+    setEditing(false);
+  };
+  const cancelRename = () => {
+    setDraft(exp.title ?? "");
+    setEditing(false);
+  };
+  const beginRename = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setDraft(exp.title ?? "");
+    setEditing(true);
+  };
 
   const created = new Date(exp.createdAt);
   const date = created.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -285,17 +331,73 @@ function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad, onDelete }: Experim
         cursor: "grab",
       }}
     >
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full flex-col items-stretch gap-1.5 p-3 text-left"
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => {
+          if (editing) return;
+          setExpanded((v) => !v);
+        }}
+        onKeyDown={(e) => {
+          if (editing) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
+        className="group flex w-full cursor-pointer flex-col items-stretch gap-1.5 p-3 text-left"
       >
         <div className="flex items-start justify-between gap-3">
-          <span
-            className="min-w-0 flex-1 text-[12.5px]"
-            style={{ color: "var(--color-text)", fontWeight: 500, lineHeight: 1.4 }}
-          >
-            {exp.hypothesis.length > 140 ? exp.hypothesis.slice(0, 140) + "…" : exp.hypothesis}
-          </span>
+          {editing ? (
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitRename();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancelRename();
+                }
+              }}
+              onBlur={commitRename}
+              maxLength={120}
+              placeholder="Short name (Esc to cancel, empty to clear)"
+              className="min-w-0 flex-1 border bg-transparent px-1.5 py-0.5 text-[12.5px] outline-none"
+              style={{
+                color: "var(--color-text)",
+                borderColor: "var(--color-accent)",
+                borderRadius: 3,
+                fontWeight: 600,
+              }}
+            />
+          ) : (
+            <span
+              className="min-w-0 flex-1 text-[12.5px]"
+              style={{
+                color: "var(--color-text)",
+                fontWeight: hasTitle ? 600 : 500,
+                lineHeight: 1.4,
+              }}
+              title={hasTitle ? exp.hypothesis : undefined}
+            >
+              {displayLabel}
+            </span>
+          )}
+          {!editing && (
+            <button
+              onClick={beginRename}
+              className="shrink-0 px-1 text-[12px] opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+              style={{ color: "var(--color-text-muted)" }}
+              title="Rename"
+            >
+              ✏️
+            </button>
+          )}
           {pinned && (
             <span className="badge accent shrink-0" style={{ fontSize: 10 }}>
               CURRENT
@@ -332,7 +434,7 @@ function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad, onDelete }: Experim
             {date} · {time}
           </span>
         </div>
-      </button>
+      </div>
 
       {expanded && (
         <ExpandedDetail

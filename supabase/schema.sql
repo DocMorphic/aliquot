@@ -11,8 +11,11 @@ create table if not exists experiments (
   domain text,
   status text not null default 'queued',
   novelty text,
+  title text,
   created_at timestamptz default now()
 );
+-- v14 migration for existing tables: add the title column if missing.
+alter table experiments add column if not exists title text;
 create index if not exists idx_experiments_created on experiments (created_at desc);
 
 -- ===== plans =====

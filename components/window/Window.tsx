@@ -190,33 +190,17 @@ export function Window({
     [appId, updateSize]
   );
 
-  // === Button handlers with defensive reset ===
-  // Local closing state — when true, render the macOS-style shrink+fade
-  // for ~150ms via the .window-closing class, then hand off to the
-  // window manager to unmount.
-  const [closing, setClosing] = useState(false);
   const handleClose = useCallback(() => {
-    if (closing) return;
     dragState.current.dragging = false;
     dragState.current.resizing = false;
-    setClosing(true);
-    setTimeout(() => closeWindow(appId), 150);
-  }, [appId, closeWindow, closing]);
+    closeWindow(appId);
+  }, [appId, closeWindow]);
 
-  const [minimizing, setMinimizing] = useState(false);
   const handleMinimize = useCallback(() => {
-    if (minimizing || closing) return;
     dragState.current.dragging = false;
     dragState.current.resizing = false;
-    setMinimizing(true);
-    // Match the windowMinimize keyframe duration (0.42s) so the
-    // animation completes before the window manager hides the window
-    // and removes our element from the visible-windows render list.
-    setTimeout(() => {
-      setMinimizing(false);
-      minimizeWindow(appId);
-    }, 410);
-  }, [appId, minimizeWindow, minimizing, closing]);
+    minimizeWindow(appId);
+  }, [appId, minimizeWindow]);
 
   const handleMaximize = useCallback(() => {
     dragState.current.dragging = false;
@@ -229,9 +213,7 @@ export function Window({
   return (
     <div
       ref={rootRef}
-      className={`window-enter ${
-        closing ? "window-closing" : ""
-      } ${minimizing ? "window-minimizing" : ""} absolute flex flex-col overflow-hidden`}
+      className="window-enter absolute flex flex-col overflow-hidden"
       style={{
         left: windowState.position.x,
         top: windowState.position.y,
