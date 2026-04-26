@@ -291,16 +291,30 @@ body {
   cursor: grabbing;
 }
 
-/* === Resize handle === */
+/* === Resize handle ===
+   Visible grip in the bottom-right corner so users discover that
+   windows are resizable. Three diagonal lines (classic OS pattern).
+   The hit area is slightly larger than the visual to make it easier
+   to grab. */
 .resize-handle {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   cursor: nwse-resize;
   background: transparent;
   z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 3px;
+  color: var(--color-text-muted);
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+.resize-handle:hover {
+  opacity: 0.95;
 }
 
 /* === Boot screen === */

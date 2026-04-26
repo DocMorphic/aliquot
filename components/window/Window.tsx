@@ -257,7 +257,20 @@ export function Window({
           onPointerUp={handleResizeUp}
           onMouseDown={(e) => e.stopPropagation()}
           aria-label="Resize window"
-        />
+          title="Drag to resize"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            aria-hidden="true"
+          >
+            <line x1="13" y1="3" x2="3" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <line x1="13" y1="7" x2="7" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <line x1="13" y1="11" x2="11" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        </div>
       )}
     </div>
   );
