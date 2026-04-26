@@ -206,28 +206,46 @@ body {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-hover); }
 
-/* === Window animations — macOS-style scale + fade === */
+/* === Window animations — macOS-style scale + fade ===
+   Open uses a subtle overshoot bounce (cubic-bezier with y > 1 in the
+   middle) which is the signature macOS feel. Close is a quick scale-
+   down without bounce. Minimize is a Genie-inspired pull toward the
+   bottom-center where the dock lives — not the real curved Genie
+   morph (that requires WebGL/SVG-clipping) but the closest we can
+   get with CSS transforms in 24h. */
 .window-enter {
-  animation: windowOpen 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: windowOpen 0.26s cubic-bezier(0.34, 1.42, 0.64, 1);
+  transform-origin: center center;
 }
 
 @keyframes windowOpen {
-  from { opacity: 0; transform: scale(0.92) translateY(8px); }
-  60%  { opacity: 1; }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(0.86); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
-/* Applied to the window root for ~150ms before the window-manager
-   actually unmounts the window. Mirror of windowOpen, slightly
-   shorter and without the bounce. */
 .window-closing {
-  animation: windowClose 0.15s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: windowClose 0.18s cubic-bezier(0.4, 0, 0.6, 1) forwards;
   pointer-events: none;
+  transform-origin: center center;
 }
 
 @keyframes windowClose {
-  from { opacity: 1; transform: scale(1) translateY(0); }
-  to   { opacity: 0; transform: scale(0.94) translateY(4px); }
+  to { opacity: 0; transform: scale(0.9); }
+}
+
+/* Genie-lite: pulls the window toward the bottom-center while
+   shrinking. Slightly slower than open/close so the eye can follow. */
+.window-minimizing {
+  animation: windowMinimize 0.42s cubic-bezier(0.55, 0.05, 0.85, 0.35) forwards;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+
+@keyframes windowMinimize {
+  to {
+    opacity: 0;
+    transform: scale(0.1) translateY(50vh);
+  }
 }
 
 /* === Window control buttons — macOS traffic-light pattern ===

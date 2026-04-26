@@ -44,6 +44,21 @@ export async function* runPipeline(
       };
       return;
     }
+    if (validation.verdict === "informal" && validation.refined) {
+      // Stop here — the client will show a confirmation panel asking
+      // the user "did you mean this refined version?". They can
+      // accept (which restarts the pipeline with the refined text),
+      // edit, or run as-is.
+      yield {
+        type: "needs_confirmation",
+        reason:
+          validation.reason ??
+          "We sharpened your hypothesis into a proper experimental claim. Confirm before we proceed.",
+        refined: validation.refined,
+        original: hypothesis,
+      };
+      return;
+    }
 
     yield { type: "stage", stage: "classifying", message: "Identifying scientific domain…" };
     const domain = await classifyDomain(hypothesis);

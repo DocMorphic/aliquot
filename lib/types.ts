@@ -44,6 +44,7 @@ export type ExperimentStatus =
   | "queued"
   | "validating"
   | "needs_refinement"
+  | "needs_confirmation"
   | "classifying"
   | "lit_qc"
   | "generating"
@@ -178,6 +179,12 @@ export type PipelineEvent =
   | { type: "plan_partial"; plan: Partial<ExperimentPlan> }
   | { type: "plan_done"; plan: ExperimentPlan; experimentId: string }
   | { type: "needs_refinement"; reason: string; suggestions: string[] }
+  | {
+      type: "needs_confirmation";
+      reason: string;
+      refined: string;
+      original: string;
+    }
   | { type: "error"; message: string };
 
 // === Window context (what data flows with each window) ===

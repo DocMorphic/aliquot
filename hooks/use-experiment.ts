@@ -15,6 +15,12 @@ interface RefinementState {
   suggestions: string[];
 }
 
+interface ConfirmationState {
+  reason: string;
+  refined: string;
+  original: string;
+}
+
 interface ExperimentState {
   experimentId: string | null;
   hypothesis: string;
@@ -24,6 +30,7 @@ interface ExperimentState {
   references: Reference[];
   plan: ExperimentPlan | null;
   refinement: RefinementState | null;
+  confirmation: ConfirmationState | null;
   error: string | null;
   runsThisSession: number;
 }
@@ -48,6 +55,7 @@ const initialState: ExperimentState = {
   references: [],
   plan: null,
   refinement: null,
+  confirmation: null,
   error: null,
   runsThisSession: 0,
 };
@@ -127,7 +135,11 @@ export function useExperimentProvider(): ExperimentContextValue {
                   domain: parsed.domain,
                 };
               }
-              if (parsed.type === "needs_refinement" || parsed.type === "error") {
+              if (
+                parsed.type === "needs_refinement" ||
+                parsed.type === "needs_confirmation" ||
+                parsed.type === "error"
+              ) {
                 experimentStarted = null;
               }
             } catch {
@@ -330,6 +342,18 @@ function applyEvent(
         status: "needs_refinement",
         stageMessage: "Hypothesis needs refinement",
         refinement: { reason: event.reason, suggestions: event.suggestions },
+      }));
+      break;
+    case "needs_confirmation":
+      setState((prev) => ({
+        ...prev,
+        status: "needs_confirmation",
+        stageMessage: "Confirm refined hypothesis",
+        confirmation: {
+          reason: event.reason,
+          refined: event.refined,
+          original: event.original,
+        },
       }));
       break;
     case "error":

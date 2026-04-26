@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useExperiment } from "@/hooks/use-experiment";
 import { useTheme } from "@/hooks/use-theme";
 import { useWindowManager } from "@/hooks/use-window-manager";
@@ -12,6 +12,7 @@ export function HypothesisWindow() {
     status,
     hypothesis: activeHypothesis,
     refinement,
+    confirmation,
     error,
   } = useExperiment();
   const { currency } = useTheme();
@@ -19,9 +20,25 @@ export function HypothesisWindow() {
   const [text, setText] = useState("");
 
   const isRunning =
-    status !== "queued" && status !== "done" && status !== "failed" && status !== "needs_refinement";
+    status !== "queued" &&
+    status !== "done" &&
+    status !== "failed" &&
+    status !== "needs_refinement" &&
+    status !== "needs_confirmation";
   const showRefinement = status === "needs_refinement" && refinement !== null;
+  const showConfirmation = status === "needs_confirmation" && confirmation !== null;
   const showError = status === "failed" && !!error;
+
+  // Clear the textarea once the plan is fully delivered so the next
+  // hypothesis starts from a blank slate. Track the previous status
+  // via a ref to avoid clearing on every "done" render.
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (prevStatusRef.current !== "done" && status === "done") {
+      setText("");
+    }
+    prevStatusRef.current = status;
+  }, [status]);
 
   async function handleRun(submitted: string) {
     const value = submitted.trim();
@@ -97,6 +114,88 @@ export function HypothesisWindow() {
           >
             Edit and re-run, or simplify the hypothesis (fewer reagents = faster generation).
           </p>
+        </div>
+      )}
+
+      {showConfirmation && confirmation && (
+        <div
+          className="border p-3"
+          style={{
+            background: "rgba(30, 64, 175, 0.06)",
+            borderColor: "var(--color-accent)",
+            borderRadius: 6,
+          }}
+        >
+          <div
+            className="text-[10.5px] font-semibold tracking-wider"
+            style={{ color: "var(--color-accent)" }}
+          >
+            DID YOU MEAN THIS?
+          </div>
+          <p
+            className="mt-1 text-[11.5px]"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            {confirmation.reason}
+          </p>
+          <div
+            className="mt-2 border p-2.5 text-[12.5px]"
+            style={{
+              background: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-text)",
+              borderRadius: 4,
+              lineHeight: 1.5,
+            }}
+          >
+            {confirmation.refined}
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <button
+              onClick={() => {
+                openWindow("lit-qc");
+                openWindow("plan");
+                void runExperiment(confirmation.refined, { currency });
+              }}
+              className="px-3 py-1 text-[11.5px] font-medium transition-colors"
+              style={{
+                background: "var(--color-accent)",
+                color: "white",
+                borderRadius: 4,
+              }}
+            >
+              Yes, run this
+            </button>
+            <button
+              onClick={() => setText(confirmation.refined)}
+              className="border px-3 py-1 text-[11.5px] transition-colors"
+              style={{
+                background: "var(--color-surface-alt)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text)",
+                borderRadius: 4,
+              }}
+            >
+              Edit it
+            </button>
+            <button
+              onClick={() => {
+                openWindow("lit-qc");
+                openWindow("plan");
+                void runExperiment(confirmation.original, { currency });
+              }}
+              className="border px-3 py-1 text-[11.5px] transition-colors"
+              style={{
+                background: "transparent",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text-muted)",
+                borderRadius: 4,
+              }}
+              title="Run my exact wording, even though it's informal"
+            >
+              No, run as-is
+            </button>
+          </div>
         </div>
       )}
 

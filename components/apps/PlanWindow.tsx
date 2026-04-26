@@ -117,8 +117,8 @@ export function PlanWindow() {
             disabled={!plan}
             className="w-full border px-2 py-1.5 text-[12px] transition-colors"
             style={{
-              background: "transparent",
-              borderColor: "var(--color-border)",
+              background: !plan ? "var(--color-surface-alt)" : "var(--color-surface-solid)",
+              borderColor: "var(--color-border-strong)",
               color: !plan ? "var(--color-text-dim)" : "var(--color-text)",
               cursor: !plan ? "not-allowed" : "pointer",
               borderRadius: 4,
@@ -604,28 +604,37 @@ function ValidationRow({ v }: { v: ValidationCriterion }) {
 
 function CaveatsTab({ plan, pending }: { plan: ExperimentPlan | null; pending: boolean }) {
   const notes = plan?.notes?.trim();
-  if (!notes)
+  const confidence = plan?.confidenceSummary;
+  if (!notes && !confidence)
     return (
       <EmptyOrSkeleton
         pending={pending}
-        hint="Caveats and known failure modes from the AI scientist review will appear here. None flagged for this plan."
+        hint="Caveats and confidence breakdown appear here once a plan is generated."
       />
     );
 
-  // The Generator tends to emit notes as a numbered list. Detect and
-  // render as <ol>; otherwise render as a paragraph block.
-  const items = parseCaveats(notes);
+  const items = notes ? parseCaveats(notes) : null;
 
   return (
-    <div>
-      <p
-        className="mb-3 text-[11.5px]"
-        style={{ color: "var(--color-text-muted)" }}
-      >
-        Things to know before running this protocol — assumptions made by the AI scientist,
-        known failure points, and items the bench should double-check.
-      </p>
-      {items ? (
+    <div className="space-y-5">
+      {confidence && <ConfidenceChart confidence={confidence} />}
+
+      {notes && (
+        <div>
+          <div
+            className="mb-2 text-[10.5px] font-semibold tracking-wider"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            CAVEATS
+          </div>
+          <p
+            className="mb-3 text-[11.5px]"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Things to know before running this protocol — assumptions made by the AI scientist,
+            known failure points, and items the bench should double-check.
+          </p>
+          {items ? (
         <ol className="space-y-2 pl-4 list-decimal" style={{ color: "var(--color-text)", lineHeight: 1.6 }}>
           {items.map((it, i) => (
             <li key={i} className="text-[12.5px]">
@@ -647,6 +656,90 @@ function CaveatsTab({ plan, pending }: { plan: ExperimentPlan | null; pending: b
           {notes}
         </div>
       )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Horizontal-bars chart showing confidence breakdown across the 6
+ *  plan dimensions. Pure SVG so no dep, plays a tiny grow-in
+ *  animation on first paint. */
+function ConfidenceChart({
+  confidence,
+}: {
+  confidence: NonNullable<ExperimentPlan["confidenceSummary"]>;
+}) {
+  const rows: { label: string; value: number; key: keyof typeof confidence }[] = [
+    { label: "Overall", value: confidence.overall, key: "overall" },
+    { label: "Protocol", value: confidence.protocol, key: "protocol" },
+    { label: "Materials", value: confidence.materials, key: "materials" },
+    { label: "Budget", value: confidence.budget, key: "budget" },
+    { label: "Timeline", value: confidence.timeline, key: "timeline" },
+    { label: "Validation", value: confidence.validation, key: "validation" },
+  ];
+  return (
+    <div>
+      <div
+        className="mb-2 text-[10.5px] font-semibold tracking-wider"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        CONFIDENCE BREAKDOWN
+      </div>
+      <div
+        className="border p-3"
+        style={{
+          background: "var(--color-surface)",
+          borderColor: "var(--color-border)",
+          borderRadius: 4,
+        }}
+      >
+        <div className="space-y-1.5">
+          {rows.map((r) => {
+            const pct = Math.round(r.value * 100);
+            const tone = pct >= 80 ? "" : pct >= 65 ? "medium" : "low";
+            const color =
+              tone === "low"
+                ? "var(--color-error)"
+                : tone === "medium"
+                ? "var(--color-warn)"
+                : "var(--color-success)";
+            return (
+              <div key={r.key} className="flex items-center gap-3 text-[11.5px]">
+                <span
+                  style={{ color: r.key === "overall" ? "var(--color-text)" : "var(--color-text-secondary)", width: 80, fontWeight: r.key === "overall" ? 600 : 400 }}
+                >
+                  {r.label}
+                </span>
+                <div
+                  className="flex-1 overflow-hidden"
+                  style={{
+                    background: "var(--color-surface-alt)",
+                    border: "1px solid var(--color-border)",
+                    height: 8,
+                    borderRadius: 3,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${pct}%`,
+                      height: "100%",
+                      background: color,
+                      transition: "width 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
+                    }}
+                  />
+                </div>
+                <span
+                  className="font-mono tabular-nums"
+                  style={{ color: "var(--color-text-muted)", width: 36, textAlign: "right" }}
+                >
+                  {pct}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
