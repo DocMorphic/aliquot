@@ -60,7 +60,7 @@ export function PlanWindow() {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
         <div className="text-[28px]" style={{ marginBottom: 8 }}>
-          ✋
+          📝
         </div>
         <h3 className="text-[15px]" style={{ fontWeight: 600 }}>
           {status === "needs_confirmation"
