@@ -16,7 +16,10 @@ const STORAGE_KEY = "aliquot:pinned-experiments";
 const ICON_HEIGHT = 88;
 const COLUMN_X = 24;
 const COLUMN_X_STEP = 100;
-const FIRST_PIN_Y = 324;
+// Pins land below every static desktop icon. The lowest static icon
+// (guide.md) sits at y=424 with a 100px row step, so pins start at 524.
+// Update this if DESKTOP_ITEMS in DesktopIcons.tsx grows.
+const FIRST_PIN_Y = 524;
 const ROW_STEP = 100;
 const BOTTOM_RESERVE = 96;
 

@@ -98,7 +98,7 @@ export function Desktop() {
   }, []);
 
   const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
+    async (e: React.DragEvent<HTMLDivElement>) => {
       const raw = e.dataTransfer.getData("application/x-aliquot-experiment");
       if (!raw) return;
       let payload: { experimentId: string; hypothesis: string; domain?: string | null };
@@ -108,17 +108,30 @@ export function Desktop() {
         return;
       }
       e.preventDefault();
-      // Drop coordinates intentionally ignored — pins auto-place in
-      // a sequential column layout (predictable + matches the user's
-      // mental model of icons appearing "below the existing ones").
-      // The user can drag-reposition after the pin lands.
+      // Confirm before pinning — the drop fires on any drag-release,
+      // including accidental small drags inside the Library card.
+      // A 1-tap confirm filters those without making the deliberate
+      // case feel slow.
+      const preview =
+        payload.hypothesis.length > 100
+          ? payload.hypothesis.slice(0, 100) + "…"
+          : payload.hypothesis;
+      const ok = await modal.confirm({
+        title: "Pin this experiment to the desktop?",
+        message: (
+          <div style={{ fontStyle: "italic" }}>&ldquo;{preview}&rdquo;</div>
+        ),
+        confirmLabel: "Pin",
+        cancelLabel: "Cancel",
+      });
+      if (!ok) return;
       desktopPins.pin({
         experimentId: payload.experimentId,
         hypothesis: payload.hypothesis,
         domain: payload.domain ?? null,
       });
     },
-    [desktopPins]
+    [desktopPins, modal]
   );
 
   return (
