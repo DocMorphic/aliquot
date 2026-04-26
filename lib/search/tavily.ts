@@ -78,3 +78,30 @@ export async function tavilyCatalogSearch(
   });
   return results[0] ?? null;
 }
+
+/**
+ * Catalog search for many reagents in parallel. Used by the Plan-B
+ * generator pipeline to pre-fetch all supplier hits BEFORE invoking
+ * Sonnet, so Sonnet can write the plan in a single round trip without
+ * tool use. Each entry is paired with its top result (or null when no
+ * supplier hit was found).
+ */
+export async function tavilyCatalogSearchBatch(
+  reagents: string[]
+): Promise<{ reagent: string; result: TavilyResult | null }[]> {
+  // Fan-out concurrency cap — Tavily handles 5-10 concurrent requests
+  // comfortably; higher tends to start rate-limiting on the free tier.
+  const CONCURRENCY = 8;
+  const out: { reagent: string; result: TavilyResult | null }[] = [];
+  for (let i = 0; i < reagents.length; i += CONCURRENCY) {
+    const batch = reagents.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map(async (r) => ({ reagent: r, result: await tavilyCatalogSearch(r) }))
+    );
+    for (const s of settled) {
+      if (s.status === "fulfilled") out.push(s.value);
+      else out.push({ reagent: "", result: null });
+    }
+  }
+  return out;
+}

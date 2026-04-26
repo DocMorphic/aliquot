@@ -1,143 +1,101 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropic, cachedSystemBlock } from "../client";
 import { MODELS } from "@/lib/constants";
-import { tavilySearch, tavilyCatalogSearch } from "@/lib/search/tavily";
+import { tavilyCatalogSearchBatch } from "@/lib/search/tavily";
 import { getRecentCorrections } from "@/lib/supabase/corrections";
 import type { Domain, ExperimentPlan, Reference } from "@/lib/types";
-import { extractJson } from "../json";
+import { extractReagents } from "./reagent-extractor";
 
-// Cap turns at 2 for Phase 2 to comfortably fit inside the Vercel
-// Hobby 60s function cap. Sonnet typically emits all needed tool calls
-// in a single response (turn 1: get_corrections + N parallel
-// search_catalog calls), then submits the plan on turn 2.
-const MAX_TOOL_TURNS = 2;
+/**
+ * Plan-B generator (post-v8 fix).
+ *
+ * The old generator used a Sonnet tool-use loop where the model
+ * orchestrated catalog searches itself across multiple turns. That
+ * burned 60-90s on biology hypotheses (15-25s per Sonnet round trip ×
+ * 2-4 turns), which doesn't fit Vercel Hobby's 60s function cap.
+ *
+ * This version splits the work so Sonnet only has to do ONE round trip:
+ *   1. extractReagents (Haiku, ~3s) — pull a specific reagent list
+ *      from the hypothesis
+ *   2. tavilyCatalogSearchBatch (~5-10s) — fan out catalog lookups in
+ *      parallel
+ *   3. getRecentCorrections (Supabase, <1s) — read seed/expert corrections
+ *   4. Sonnet plan synthesis (~25-35s) — single call with all pre-fetched
+ *      data inline. Sonnet emits the structured plan via the submit_plan
+ *      tool (only tool available, called exactly once).
+ *
+ * Total budget: ~35-50s, comfortably inside 60s.
+ */
 
 const SYSTEM = `You are a senior PI drafting a complete, operationally realistic experiment plan.
 
-You receive a scientific hypothesis (and optional references) and must produce a plan that another PI would trust enough to order materials and run on Monday.
+You receive a scientific hypothesis, a list of reagents whose catalog numbers have already been looked up for you, recent expert corrections from past scientist reviews, and reference papers from the literature QC stage. Your job is to produce a plan that another PI would trust enough to order materials and run on Monday.
 
 CRITICAL RULES:
-1. NEVER invent catalog numbers, supplier names, or prices. Use the search_catalog tool for every reagent.
-2. If search_catalog returns no useful result, mark the material with verified=false and best-guess values, do NOT fabricate.
-3. Cite real papers and protocols where possible. Use search_protocols when you need methodology grounding.
-4. Be specific: name antibody clones (e.g. "anti-CRP, clone C7"), reagent grades, mouse strains, cell line passage.
-5. Use × g not rpm for centrifugation. Concentrations in molar units (nM/µM/mM). Times in min/h. Temperatures in °C.
-6. Include a control condition for every comparative claim.
-7. ALWAYS populate the equipment field with 3-6 entries. A real lab cannot run an experiment without knowing what major instruments it requires (centrifuge, plate reader, flow cytometer, HPLC, microscope, anaerobic chamber, potentiostat, controlled-rate freezer, etc.). Equipment is NOT reagents — list only physical instruments and large consumable infrastructure. If something is truly trivial (vortexer, pipette set), exclude it.
+1. NEVER invent catalog numbers, supplier names, or prices. Use the catalog data provided. If a reagent has no catalog hit, mark verified=false and best-guess but flag it in the notes.
+2. Apply expert corrections when applicable — they encode hard-won lab knowledge.
+3. Be specific: name antibody clones, reagent grades, mouse strains, cell-line passage limits.
+4. Use × g not rpm for centrifugation. Concentrations in molar units (nM/µM/mM). Times in min/h. Temperatures in °C.
+5. Include a control condition for every comparative claim.
+6. ALWAYS populate the equipment field with 3-6 entries — major instruments only (centrifuge, plate reader, flow cytometer, HPLC, microscope, anaerobic chamber, potentiostat, controlled-rate freezer). Do NOT list reagents in equipment.
 
-WORKFLOW:
-- FIRST, call get_corrections(domain) to fetch recent expert corrections in this domain. If results are returned, treat them as authoritative — apply the same correction to your plan if the same situation appears.
-- Then call search_catalog for each major reagent in turn (or in batch). Limit yourself to ~6-8 tool calls total to stay efficient.
-- Then call submit_plan with the final structured plan. submit_plan ends the workflow.
-
-The submit_plan tool takes the full plan JSON as its input. Schema:
+You output via a single call to the submit_plan tool. Schema:
 
 {
   "domain": "biology" | "chemistry" | "physics" | "climate",
-  "protocol": [
-    { "index": 1, "text": "...", "duration": "30 min" | "2 h" | "Day 1-3", "citations": [{"refId":"R1","url":"..."}] }
-  ],
-  "materials": [
-    {
-      "reagent": "Anti-CRP capture antibody (clone C7, mouse mAb)",
-      "supplier": "Sigma-Aldrich",
-      "catalogNumber": "C7-100",
-      "quantity": "100 µg",
-      "unitPrice": 412,
-      "currency": "$",
-      "url": "https://www.sigmaaldrich.com/...",
-      "verified": true
-    }
-  ],
+  "protocol": [{ "index": 1, "text": "...", "duration": "30 min" | "2 h" | "Day 1-3", "citations": [{"refId":"R1"}] }],
+  "materials": [{
+    "reagent": "Anti-CRP capture antibody (clone C7, mouse mAb)",
+    "supplier": "Sigma-Aldrich",
+    "catalogNumber": "C7-100",
+    "quantity": "100 µg",
+    "unitPrice": 412,
+    "currency": "$",
+    "url": "https://www.sigmaaldrich.com/...",
+    "verified": true
+  }],
   "budget": {
-    "lines": [
-      { "category": "materials"|"labor"|"equipment"|"overhead", "label": "...", "amount": 1196, "currency": "$", "notes": "optional" }
-    ],
+    "lines": [{ "category": "materials"|"labor"|"equipment"|"overhead", "label": "...", "amount": 1196, "currency": "$" }],
     "total": 7743,
     "currency": "$"
   },
-  "timeline": [
-    { "index": 1, "name": "...", "duration": "1 week", "durationDays": 7, "dependsOn": [], "description": "optional" }
-  ],
-  "validation": [
-    { "metric": "Limit of detection", "threshold": "< 0.5 mg/L", "method": "...", "citations": [{"refId":"R1"}] }
-  ],
-  "equipment": ["REQUIRED. 3-6 entries. Format: '<instrument name>: <brief purpose>'. Examples: 'Refrigerated centrifuge (5,000 × g capable): cell pelleting and lysate clarification', 'Flow cytometer (BD FACSCalibur or equivalent): post-thaw viability via Annexin V/PI'. Do NOT list reagents here."],
-  "notes": "Short, sharp caveats: known failure modes, irreproducibility risks, assumptions, anything a real PI should be told before running this. 2-5 sentences max."
+  "timeline": [{ "index": 1, "name": "...", "duration": "1 week", "durationDays": 7, "dependsOn": [] }],
+  "validation": [{ "metric": "Limit of detection", "threshold": "< 0.5 mg/L", "method": "...", "citations": [{"refId":"R1"}] }],
+  "equipment": ["Refrigerated centrifuge (5,000 × g): cell pelleting", "Flow cytometer: viability"],
+  "notes": "Short caveats — known failure modes, assumptions, anything a real PI should be told. 2-5 sentences."
 }
 
 Aim for: ~5-8 protocol steps, ~6-12 materials, ~3-6 budget lines, ~3-6 timeline phases, ~2-4 validation criteria, ~3-6 equipment items.
 
-CURRENCY: render all prices and budget amounts in {{CURRENCY}} (USD = $, EUR = €, GBP = £). Use the matching ISO symbol everywhere. Numeric values stay numeric (no commas, no symbol).`;
+CURRENCY: render all prices and budget amounts in {{CURRENCY}} (USD = $, EUR = €, GBP = £). Numeric values stay numeric (no commas, no symbol).`;
 
 const TOOLS: Anthropic.Messages.Tool[] = [
   {
-    name: "search_catalog",
-    description:
-      "Search supplier catalogs for a specific reagent. Returns catalog number, supplier, price, and product URL. Use this for every material entry — never invent catalog numbers.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        reagent: {
-          type: "string",
-          description:
-            "Specific reagent name including clone, isotype, conjugate, or grade where applicable (e.g. 'anti-CRP IgG, clone C7, mouse mAb' rather than 'antibody').",
-        },
-      },
-      required: ["reagent"],
-    },
-  },
-  {
-    name: "search_protocols",
-    description:
-      "Search published protocols on protocols.io and Bio-protocol for grounded methodology.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        query: {
-          type: "string",
-          description: "Natural-language description of the methodology you need to ground.",
-        },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "get_corrections",
-    description:
-      "Retrieve recent expert corrections in this domain (from past scientist reviews). Each correction shows what was originally generated, what the scientist corrected it to, and why. APPLY these corrections to your plan when they're applicable — they encode hard-won lab knowledge. Call this once at the start.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        domain: {
-          type: "string",
-          enum: ["biology", "chemistry", "physics", "climate"],
-        },
-      },
-      required: ["domain"],
-    },
-  },
-  {
     name: "submit_plan",
     description:
-      "Submit the final structured experiment plan. Calling this ends the workflow. Pass the entire plan JSON as the `plan` argument.",
+      "Submit the structured experiment plan. Pass the entire plan JSON as the `plan` argument. This is the ONLY tool — call it exactly once.",
     input_schema: {
       type: "object" as const,
       properties: {
-        plan: { type: "object", description: "Full plan JSON matching the schema in the system prompt." },
+        plan: {
+          type: "object",
+          description: "Full plan JSON matching the schema in the system prompt.",
+        },
       },
       required: ["plan"],
     },
   },
 ];
 
-interface GeneratorRunResult {
-  plan: ExperimentPlan;
-  toolCallCount: number;
-}
-
 export interface GeneratorOptions {
   currency?: "USD" | "EUR" | "GBP";
+}
+
+interface CatalogHit {
+  reagent: string;
+  url: string;
+  title: string;
+  snippet: string;
 }
 
 export async function generatePlan(
@@ -146,153 +104,143 @@ export async function generatePlan(
   references: Reference[],
   options: GeneratorOptions = {}
 ): Promise<ExperimentPlan> {
-  const result = await runGenerator(hypothesis, domain, references, options);
-  return result.plan;
+  // 1. Reagent extraction (Haiku, ~3s)
+  console.log(`[generate] step1 reagent-extraction start`);
+  const reagents = await extractReagents(hypothesis, domain);
+  console.log(`[generate] step1 done, ${reagents.length} reagents`);
+
+  // 2. Parallel Tavily catalog lookups + corrections in parallel
+  console.log(`[generate] step2 catalog+corrections start`);
+  const [catalogResults, corrections] = await Promise.all([
+    tavilyCatalogSearchBatch(reagents).catch((err) => {
+      console.warn("[generate] tavily batch failed:", (err as Error).message);
+      return [] as { reagent: string; result: import("@/lib/search/tavily").TavilyResult | null }[];
+    }),
+    getRecentCorrections(domain, 5).catch(() => []),
+  ]);
+  const hits: CatalogHit[] = catalogResults
+    .filter((c) => c.result !== null)
+    .map((c) => ({
+      reagent: c.reagent,
+      url: c.result!.url,
+      title: c.result!.title,
+      // Trim snippet to keep input tokens low — we mainly need the URL +
+      // title for the model to extract a catalog #. Long content hurts
+      // Sonnet/Haiku TTFT.
+      snippet: (c.result!.content ?? "").slice(0, 250),
+    }));
+  console.log(
+    `[generate] step2 done, ${hits.length}/${catalogResults.length} catalog hits, ${corrections.length} corrections`
+  );
+
+  // 3. Sonnet plan synthesis (single tool-use call to submit_plan)
+  console.log(`[generate] step3 sonnet-synthesis start`);
+  const result = await synthesizePlan({
+    hypothesis,
+    domain,
+    references,
+    reagents,
+    hits,
+    corrections,
+    currency: options.currency ?? "USD",
+  });
+  console.log(`[generate] step3 done`);
+  return result;
 }
 
-async function runGenerator(
-  hypothesis: string,
-  domain: Domain,
-  references: Reference[],
-  options: GeneratorOptions
-): Promise<GeneratorRunResult> {
-  const client = getAnthropic();
+interface SynthesizeArgs {
+  hypothesis: string;
+  domain: Domain;
+  references: Reference[];
+  reagents: string[];
+  hits: CatalogHit[];
+  corrections: Awaited<ReturnType<typeof getRecentCorrections>>;
+  currency: "USD" | "EUR" | "GBP";
+}
 
-  const refsBlock = references.length
-    ? `\n\nReferences from literature QC (cite as R1, R2, ...):\n${references
-        .map((r, i) => `[R${i + 1}] ${r.title} — ${r.authors.slice(0, 3).join(", ")}${r.year ? ` (${r.year})` : ""}`)
+async function synthesizePlan(args: SynthesizeArgs): Promise<ExperimentPlan> {
+  const client = getAnthropic();
+  const renderedSystem = SYSTEM.replace(/\{\{CURRENCY\}\}/g, args.currency);
+
+  const referencesBlock = args.references.length
+    ? `\n## Literature references (cite as R1, R2, ...):\n${args.references
+        .map(
+          (r, i) =>
+            `[R${i + 1}] ${r.title} — ${r.authors.slice(0, 3).join(", ")}${
+              r.authors.length > 3 ? " et al." : ""
+            }${r.year ? ` (${r.year})` : ""}`
+        )
         .join("\n")}`
     : "";
 
-  const currency = options.currency ?? "USD";
-  const renderedSystem = SYSTEM.replace(/\{\{CURRENCY\}\}/g, currency);
-  const userOpening = `Hypothesis:\n${hypothesis}\n\nDomain: ${domain}\nCurrency: ${currency}${refsBlock}\n\nDraft the plan. Use search_catalog for every reagent. Call submit_plan when ready.`;
+  const reagentsBlock = args.reagents.length
+    ? `\n## Reagents to include (extracted from your hypothesis):\n${args.reagents.map((r) => `  - ${r}`).join("\n")}`
+    : "";
 
-  const messages: Anthropic.Messages.MessageParam[] = [
-    { role: "user", content: userOpening },
-  ];
+  const catalogBlock = args.hits.length
+    ? `\n## Catalog data (use these — already verified live against supplier domains):\n${args.hits
+        .map(
+          (h) =>
+            `### "${h.reagent}"\n  URL: ${h.url}\n  Title: ${h.title}\n  Snippet: ${h.snippet}`
+        )
+        .join("\n\n")}`
+    : "";
 
-  let toolCallCount = 0;
+  const correctionsBlock = args.corrections.length
+    ? `\n## Recent expert corrections in this domain (apply when relevant):\n${args.corrections
+        .map(
+          (c, i) =>
+            `${i + 1}. [section: ${c.section_path}] originally: "${c.original ?? "—"}" → corrected: "${c.corrected}"${
+              c.rationale ? ` — ${c.rationale}` : ""
+            }`
+        )
+        .join("\n")}`
+    : "";
 
-  for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-    const response = await client.messages.create({
-      model: MODELS.reason,
-      // submit_plan's input includes the full plan JSON, which is large.
-      // 4096 cut off mid-tool-call; 12000 leaves headroom for the largest
-      // plans (~6-8K tokens of structured output) without unbounded cost.
-      max_tokens: 12000,
-      system: cachedSystemBlock(renderedSystem),
-      tools: TOOLS,
-      messages,
-    });
+  const userMessage = `# Hypothesis
+${args.hypothesis}
 
-    if (response.stop_reason !== "tool_use") {
-      // Sonnet ended without calling submit_plan — try to salvage JSON from text.
-      const text =
-        response.content.find((b): b is Anthropic.Messages.TextBlock => b.type === "text")
-          ?.text ?? "";
-      const salvaged = extractJson<Partial<ExperimentPlan>>(text);
-      if (salvaged) {
-        return {
-          plan: finalizePlan(salvaged, hypothesis, domain, references),
-          toolCallCount,
-        };
-      }
-      throw new Error(
-        `Generator ended without submit_plan and no parseable JSON. stop_reason=${response.stop_reason}`
-      );
-    }
+# Domain
+${args.domain}
 
-    // Process all tool_use blocks in this turn, build a single user response.
-    messages.push({ role: "assistant", content: response.content });
-    const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
-    let submitted: ExperimentPlan | null = null;
+# Currency
+${args.currency}
+${reagentsBlock}
+${catalogBlock}
+${correctionsBlock}
+${referencesBlock}
 
-    for (const block of response.content) {
-      if (block.type !== "tool_use") continue;
-      toolCallCount++;
-      const { id, name, input } = block;
-      try {
-        if (name === "search_catalog") {
-          const inp = input as { reagent: string };
-          const result = await tavilyCatalogSearch(inp.reagent);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: id,
-            content: JSON.stringify(
-              result
-                ? {
-                    title: result.title,
-                    url: result.url,
-                    snippet: result.content?.slice(0, 800),
-                  }
-                : { note: "no supplier match found" }
-            ),
-          });
-        } else if (name === "search_protocols") {
-          const inp = input as { query: string };
-          const results = await tavilySearch(inp.query, {
-            maxResults: 3,
-            includeDomains: ["protocols.io", "bio-protocol.org", "openwetware.org", "nature.com"],
-            searchDepth: "advanced",
-          });
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: id,
-            content: JSON.stringify(
-              results.map((r) => ({ title: r.title, url: r.url, snippet: r.content?.slice(0, 600) }))
-            ),
-          });
-        } else if (name === "get_corrections") {
-          const inp = input as { domain: Domain };
-          const corrections = await getRecentCorrections(inp.domain, 5);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: id,
-            content: JSON.stringify(
-              corrections.length === 0
-                ? { note: "no prior corrections in this domain yet" }
-                : corrections.map((c) => ({
-                    section: c.section_path,
-                    original: c.original,
-                    corrected: c.corrected,
-                    rationale: c.rationale,
-                    rating: c.rating,
-                  }))
-            ),
-          });
-        } else if (name === "submit_plan") {
-          const inp = input as { plan: Partial<ExperimentPlan> };
-          submitted = finalizePlan(inp.plan, hypothesis, domain, references);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: id,
-            content: "ok",
-          });
-        } else {
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: id,
-            content: `Unknown tool: ${name}`,
-            is_error: true,
-          });
-        }
-      } catch (err) {
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: id,
-          content: `Tool error: ${(err as Error).message}`,
-          is_error: true,
-        });
-      }
-    }
+Produce the plan now by calling submit_plan with the full plan JSON. Use the catalog data above for every material entry — extract real catalog numbers from the URLs/titles/snippets. Apply the expert corrections where applicable.`;
 
-    if (submitted) return { plan: submitted, toolCallCount };
+  // Switched from Sonnet 4.6 (MODELS.reason) to Haiku 4.5 (MODELS.fast)
+  // for plan synthesis. With Tavily catalog data, corrections, and
+  // references already pre-fetched and handed to the model inline, this
+  // step is structured-output formatting — not novel reasoning. Haiku
+  // is 3-5x faster than Sonnet for this profile and produces a fully
+  // valid plan against the submit_plan schema. If quality regresses
+  // noticeably (e.g. less polished protocol prose), revert MODELS.fast
+  // → MODELS.reason here.
+  const response = await client.messages.create({
+    model: MODELS.fast,
+    max_tokens: 8000,
+    system: cachedSystemBlock(renderedSystem),
+    tools: TOOLS,
+    tool_choice: { type: "tool", name: "submit_plan" },
+    messages: [{ role: "user", content: userMessage }],
+  });
 
-    messages.push({ role: "user", content: toolResults });
+  // Find the submit_plan tool_use block
+  const toolUse = response.content.find(
+    (b): b is Anthropic.Messages.ToolUseBlock =>
+      b.type === "tool_use" && b.name === "submit_plan"
+  );
+  if (!toolUse) {
+    throw new Error(
+      `synthesizePlan: model did not call submit_plan (stop_reason=${response.stop_reason})`
+    );
   }
-
-  throw new Error(`Generator exceeded ${MAX_TOOL_TURNS} tool turns without calling submit_plan`);
+  const partial = (toolUse.input as { plan?: Partial<ExperimentPlan> })?.plan ?? {};
+  return finalizePlan(partial, args.hypothesis, args.domain, args.references);
 }
 
 /**
