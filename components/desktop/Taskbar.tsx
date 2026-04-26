@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useWindowManager } from "@/hooks/use-window-manager";
 import { APP_REGISTRY } from "@/lib/constants";
 
-const DOCK_APPS_ORDER = ["hypothesis", "lit-qc", "plan", "review", "library", "help", "settings"];
+const DOCK_APPS_ORDER = ["hypothesis", "lit-qc", "plan", "review", "library", "guidelines", "docs", "help", "settings"];
 
 const DOCK_APPS = DOCK_APPS_ORDER.map((id) => APP_REGISTRY[id]).filter(Boolean);
 
@@ -67,6 +67,20 @@ const DOCK_ICONS: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="9" />
       <path d="M9.5 9.5a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 4" />
       <circle cx="12" cy="17" r="0.5" fill="currentColor" />
+    </svg>
+  ),
+  docs: (
+    <svg width="20" height="20" viewBox="0 0 24 24" {...ICON_PROPS}>
+      <path d="M4 5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" />
+      <path d="M13 3v5h5" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+      <line x1="8" y1="17" x2="14" y2="17" />
+    </svg>
+  ),
+  guidelines: (
+    <svg width="20" height="20" viewBox="0 0 24 24" {...ICON_PROPS}>
+      <path d="M4 4h16v4H4zM4 11h12v3H4zM4 17h16v3H4z" />
+      <line x1="18" y1="11" x2="20" y2="14" />
     </svg>
   ),
   settings: (

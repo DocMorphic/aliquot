@@ -1,6 +1,8 @@
 import { getServerSupabase } from "./client";
 import type { Domain } from "@/lib/types";
 
+export type CorrectionScope = "experiment" | "general";
+
 export interface CorrectionRecord {
   id: string;
   plan_id: string | null;
@@ -10,6 +12,7 @@ export interface CorrectionRecord {
   corrected: string;
   rationale: string | null;
   rating: number | null;
+  scope: CorrectionScope;
   created_at: string;
 }
 
@@ -29,10 +32,14 @@ export async function getRecentCorrections(
 ): Promise<CorrectionRecord[]> {
   try {
     const sb = getServerSupabase();
+    // Only general guidelines feed back into future plans. Per-experiment
+    // notes (scope='experiment') are kept as audit trail but never injected
+    // as few-shot examples — they were specific to that one run.
     const { data, error } = await sb
       .from("corrections")
       .select("*")
       .eq("domain", domain)
+      .eq("scope", "general")
       .order("rating", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -52,6 +59,7 @@ export interface NewCorrection {
   corrected: string;
   rationale?: string;
   rating: number;
+  scope: CorrectionScope;
 }
 
 export async function insertCorrections(
@@ -101,6 +109,7 @@ export async function insertCorrections(
       corrected: c.corrected,
       rationale: c.rationale ?? null,
       rating: c.rating,
+      scope: c.scope,
     }));
     const { error } = await sb.from("corrections").insert(rows);
     if (error) throw error;

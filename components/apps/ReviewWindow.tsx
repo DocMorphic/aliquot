@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useExperiment } from "@/hooks/use-experiment";
 
+type CorrectionScope = "experiment" | "general";
+
 interface CorrectionDraft {
   sectionPath: string;
   original: string;
@@ -24,6 +26,7 @@ export function ReviewWindow() {
   const [drafts, setDrafts] = useState<CorrectionDraft[]>([
     { sectionPath: "protocol", original: "", corrected: "", rationale: "", rating: 4 },
   ]);
+  const [scope, setScope] = useState<CorrectionScope>("experiment");
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
@@ -66,11 +69,16 @@ export function ReviewWindow() {
         body: JSON.stringify({
           experimentId,
           domain: plan.domain,
+          scope,
           corrections: valid,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setConfirmation("Saved. Next plan in this domain will incorporate your feedback.");
+      setConfirmation(
+        scope === "general"
+          ? `Saved as a ${plan.domain} guideline. All future plans in this domain will reflect it.`
+          : "Saved as a note on this experiment only. Future plans are unaffected."
+      );
       setDrafts([
         { sectionPath: "protocol", original: "", corrected: "", rationale: "", rating: 4 },
       ]);
@@ -88,9 +96,38 @@ export function ReviewWindow() {
           Scientist Review
         </h3>
         <p className="mt-1 text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>
-          Your corrections train the system. The next plan in domain{" "}
-          <span style={{ color: "var(--color-accent)" }}>{plan.domain}</span> will reflect them.
+          Pick a scope below. <span style={{ color: "var(--color-accent)" }}>{plan.domain}</span> guidelines apply to every future plan; experiment notes stay attached to this run only.
         </p>
+      </div>
+
+      <div
+        className="border p-2"
+        style={{
+          background: "var(--color-surface)",
+          borderColor: "var(--color-border)",
+          borderRadius: 4,
+        }}
+      >
+        <div
+          className="text-[10px] font-semibold tracking-wider"
+          style={{ color: "var(--color-text-muted)", marginBottom: 6 }}
+        >
+          SCOPE
+        </div>
+        <div className="flex gap-1.5">
+          <ScopeButton
+            active={scope === "experiment"}
+            onClick={() => setScope("experiment")}
+            label="This experiment only"
+            sub="Note · won't change future plans"
+          />
+          <ScopeButton
+            active={scope === "general"}
+            onClick={() => setScope("general")}
+            label="General guideline"
+            sub={`Applies to all future ${plan.domain} plans`}
+          />
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar">
@@ -231,8 +268,47 @@ export function ReviewWindow() {
           borderRadius: 4,
         }}
       >
-        {submitting ? "Saving…" : "Save corrections"}
+        {submitting
+          ? "Saving…"
+          : scope === "general"
+            ? "Save as guideline"
+            : "Save note on this experiment"}
       </button>
     </div>
+  );
+}
+
+function ScopeButton({
+  active,
+  onClick,
+  label,
+  sub,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  sub: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex-1 border px-2 py-1.5 text-left transition-colors"
+      style={{
+        background: active ? "var(--color-accent)" : "var(--color-surface-alt)",
+        borderColor: active ? "var(--color-accent)" : "var(--color-border)",
+        color: active ? "white" : "var(--color-text)",
+        borderRadius: 4,
+      }}
+    >
+      <div className="text-[11.5px]" style={{ fontWeight: 600 }}>
+        {label}
+      </div>
+      <div
+        className="text-[10px]"
+        style={{ color: active ? "rgba(255,255,255,0.85)" : "var(--color-text-muted)" }}
+      >
+        {sub}
+      </div>
+    </button>
   );
 }

@@ -58,10 +58,17 @@ create table if not exists corrections (
   corrected text,
   rationale text,
   rating int,
+  -- 'experiment' = note about this run only (audit trail; never injected
+  -- into future plans). 'general' = guideline applied to every future
+  -- plan in this domain.
+  scope text not null default 'experiment',
   embedding vector(1536),
   created_at timestamptz default now()
 );
+-- v15 migration for existing rows: backfill missing column.
+alter table corrections add column if not exists scope text not null default 'experiment';
 create index if not exists idx_corrections_domain on corrections (domain);
+create index if not exists idx_corrections_scope on corrections (scope);
 create index if not exists idx_corrections_embedding on corrections
   using ivfflat (embedding vector_cosine_ops)
   with (lists = 100);

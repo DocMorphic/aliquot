@@ -1,5 +1,9 @@
 import type { NextRequest } from "next/server";
-import { insertCorrections, type NewCorrection } from "@/lib/supabase/corrections";
+import {
+  insertCorrections,
+  type NewCorrection,
+  type CorrectionScope,
+} from "@/lib/supabase/corrections";
 import type { Domain } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -33,6 +37,7 @@ export async function POST(req: NextRequest) {
     experimentId?: string | null;
     planId?: string | null;
     domain?: Domain;
+    scope?: CorrectionScope;
     corrections?: Array<{
       sectionPath?: string;
       original?: string;
@@ -63,6 +68,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const scope: CorrectionScope = body.scope === "general" ? "general" : "experiment";
   const records: NewCorrection[] = body.corrections
     .filter((c) => c.corrected && c.corrected.trim().length > 0)
     .map((c) => ({
@@ -73,6 +79,7 @@ export async function POST(req: NextRequest) {
       corrected: c.corrected!,
       rationale: c.rationale,
       rating: typeof c.rating === "number" ? c.rating : 4,
+      scope,
     }));
 
   if (records.length === 0) {
@@ -90,7 +97,7 @@ export async function POST(req: NextRequest) {
     );
   }
   return new Response(
-    JSON.stringify({ ok: true, inserted: result.inserted }),
+    JSON.stringify({ ok: true, inserted: result.inserted, scope }),
     { status: 200, headers: { "content-type": "application/json" } }
   );
 }

@@ -28,7 +28,12 @@ export function HelpApp() {
           <li>Click <kbd>Run</kbd> (or press <kbd>⌘+Enter</kbd>).</li>
           <li>Lit QC populates first — novelty signal + 1–3 references.</li>
           <li>The Plan window streams in section by section: protocol, materials, budget, timeline, validation.</li>
-          <li>Click <kbd>Review &amp; Correct</kbd> to leave structured feedback. Future plans in the same domain will reflect it.</li>
+          <li>
+            Click <kbd>Review &amp; Correct</kbd> to leave structured feedback. Pick scope:
+            a note on this run only, or a domain-wide guideline that future plans honor.
+          </li>
+          <li>Open <strong>Guidelines</strong> to see and prune the saved domain rules.</li>
+          <li>Open <strong>Docs</strong> for clone-and-run instructions, the HTTP API, and an MCP wrapper.</li>
         </ol>
       </Section>
 
@@ -42,59 +47,6 @@ export function HelpApp() {
           <li>Verifier — live re-checks every catalog number</li>
           <li>Confidence annotator — 0–100% per claim based on source agreement</li>
         </ol>
-      </Section>
-
-      <Section title="Run locally">
-        <p>Aliquot is open source — clone the repo and you can run the whole pipeline against your own keys.</p>
-        <CodeBlock>{`git clone https://github.com/DocMorphic/aliquot
-cd aliquot
-cp .env.example .env.local   # fill ANTHROPIC_API_KEY, TAVILY_API_KEY,
-                             # NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-npm install
-npm run dev                  # → http://localhost:3000`}</CodeBlock>
-      </Section>
-
-      <Section title="HTTP API">
-        <p>Hit the same endpoints the UI uses. Phase 1 streams Server-Sent Events; Phases 2 + 3 return JSON.</p>
-        <CodeBlock>{`# Phase 1 — validator + classifier + lit QC (SSE stream)
-curl -N -X POST https://aliquot-pi.vercel.app/api/experiment/run \\
-  -H "Content-Type: application/json" \\
-  -d '{"hypothesis":"Metformin extends yeast lifespan via AMPK","currency":"USD"}'
-# → emits experiment_started { experimentId, domain }, then lit_qc, etc.
-
-# Phase 2 — generator
-curl -X POST https://aliquot-pi.vercel.app/api/experiment/<id>/generate \\
-  -H "Content-Type: application/json" -d '{"currency":"USD"}'
-
-# Phase 3 — verify catalog numbers + score
-curl -X POST https://aliquot-pi.vercel.app/api/experiment/<id>/verify`}</CodeBlock>
-      </Section>
-
-      <Section title="MCP integration">
-        <p>Wrap the API as a Model Context Protocol tool so Claude Desktop or Cursor can call it directly.</p>
-        <CodeBlock>{`// aliquot-mcp.ts — bare-bones MCP server stub
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-
-const BASE = process.env.ALIQUOT_BASE ?? "https://aliquot-pi.vercel.app";
-
-const server = new Server({ name: "aliquot", version: "0.1.0" }, {
-  capabilities: { tools: {} },
-});
-
-server.setRequestHandler("tools/call", async ({ params }) => {
-  if (params.name !== "run_aliquot_experiment") throw new Error("unknown tool");
-  // 1. POST hypothesis → experiment_started → grab id
-  // 2. POST /:id/generate
-  // 3. POST /:id/verify → return final plan JSON
-  return { content: [{ type: "text", text: "..." }] };
-});
-
-await server.connect(new StdioServerTransport());`}</CodeBlock>
-        <p style={{ marginTop: 6 }}>
-          Add to <code>~/.config/claude/claude_desktop_config.json</code> under{" "}
-          <code>mcpServers</code> and Claude Desktop can run experiments on demand.
-        </p>
       </Section>
 
       <Section title="Keyboard shortcuts">
@@ -123,22 +75,5 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </h3>
       <div style={{ color: "var(--color-text-secondary)" }}>{children}</div>
     </div>
-  );
-}
-
-function CodeBlock({ children }: { children: string }) {
-  return (
-    <pre
-      className="custom-scrollbar mt-1.5 overflow-x-auto whitespace-pre border p-2 font-mono text-[10.5px]"
-      style={{
-        background: "var(--color-surface-alt)",
-        borderColor: "var(--color-border)",
-        borderRadius: 4,
-        color: "var(--color-text)",
-        lineHeight: 1.5,
-      }}
-    >
-      {children}
-    </pre>
   );
 }

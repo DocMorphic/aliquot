@@ -24,6 +24,8 @@ import { PlanWindow } from "@/components/apps/PlanWindow";
 import { ReviewWindow } from "@/components/apps/ReviewWindow";
 import { LibraryApp } from "@/components/apps/LibraryApp";
 import { HelpApp } from "@/components/apps/HelpApp";
+import { DocsApp } from "@/components/apps/DocsApp";
+import { GuidelinesApp } from "@/components/apps/GuidelinesApp";
 import { SettingsApp } from "@/components/apps/SettingsApp";
 
 const APP_COMPONENTS: Record<string, React.ComponentType> = {
@@ -33,6 +35,8 @@ const APP_COMPONENTS: Record<string, React.ComponentType> = {
   review: ReviewWindow,
   library: LibraryApp,
   help: HelpApp,
+  docs: DocsApp,
+  guidelines: GuidelinesApp,
   settings: SettingsApp,
 };
 

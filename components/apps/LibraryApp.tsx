@@ -136,7 +136,7 @@ export function LibraryApp() {
             Library
           </h3>
           <p className="mt-1 text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>
-            Recent experiments persisted in Supabase. Click to expand · hover ✏️ to rename · drag onto desktop to pin.
+            Recent experiments persisted in Supabase. Click to expand · use Rename to give a run a short name · drag onto desktop to pin.
           </p>
         </div>
         <button
@@ -391,11 +391,16 @@ function ExperimentCard({ exp, pinned, inMemoryPlan, onLoad, onDelete, onRename 
           {!editing && (
             <button
               onClick={beginRename}
-              className="shrink-0 px-1 text-[12px] opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-              style={{ color: "var(--color-text-muted)" }}
-              title="Rename"
+              className="shrink-0 border px-2 py-0.5 text-[10.5px] transition-colors"
+              style={{
+                background: "var(--color-surface-alt)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text-secondary)",
+                borderRadius: 3,
+              }}
+              title="Rename this experiment"
             >
-              ✏️
+              Rename
             </button>
           )}
           {pinned && (
