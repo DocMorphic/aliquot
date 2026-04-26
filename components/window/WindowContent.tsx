@@ -11,8 +11,8 @@ export function WindowContent({ children, noPadding }: WindowContentProps) {
       // Window content needs the opposite — users want to copy protocol
       // steps, references, catalog #s. `select-text` on the wrapper
       // overrides the parent for everything inside windows.
-      className={`custom-scrollbar select-text flex-1 overflow-y-auto ${
-        noPadding ? "" : "px-6 py-5"
+      className={`select-text flex-1 ${
+        noPadding ? "overflow-hidden" : "custom-scrollbar overflow-y-auto px-6 py-5"
       }`}
       style={{ color: "var(--color-text)", background: "var(--color-surface-solid)" }}
     >

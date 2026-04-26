@@ -32,6 +32,8 @@ export interface AppDefinition {
   defaultY: number;
   showInExplorer: boolean;
   showInTaskbar: boolean;
+  /** Render the app component flush against the window edges (no inner padding). */
+  noContentPadding?: boolean;
 }
 
 // === Aliquot — experiment domain ===

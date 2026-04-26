@@ -30,20 +30,24 @@ interface IconPos {
 interface DesktopItem {
   id: string;
   label: string;
-  type: "folder" | "app" | "doc";
+  type: "folder" | "app" | "doc" | "book";
   appId?: string;
 }
 
 const DESKTOP_ITEMS: DesktopItem[] = [
   { id: "experiments", label: "experiments", type: "folder", appId: "library" },
   { id: "new-experiment", label: "New Experiment", type: "app", appId: "hypothesis" },
+  { id: "guidelines", label: "guidelines", type: "folder", appId: "guidelines" },
+  { id: "docs", label: "Docs", type: "book", appId: "docs" },
   { id: "guide", label: "guide.md", type: "doc", appId: "help" },
 ];
 
 const DEFAULT_POSITIONS: Record<string, IconPos> = {
   experiments: { x: 24, y: 24 },
   "new-experiment": { x: 24, y: 124 },
-  guide: { x: 24, y: 224 },
+  guidelines: { x: 24, y: 224 },
+  docs: { x: 24, y: 324 },
+  guide: { x: 24, y: 424 },
 };
 
 function clampPosition(x: number, y: number): IconPos {
@@ -479,7 +483,7 @@ function DesktopIconSvg({
   type,
   size = 52,
 }: {
-  type: "folder" | "app" | "doc";
+  type: "folder" | "app" | "doc" | "book";
   size?: number;
 }) {
   if (type === "folder") {
@@ -520,6 +524,31 @@ function DesktopIconSvg({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+      </svg>
+    );
+  }
+  if (type === "book") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 52 52" fill="none">
+        <path
+          d="M8 8 Q 8 6 10 6 L 24 6 Q 26 7 26 9 L 26 44 Q 24 42 22 42 L 10 42 Q 8 42 8 40 Z"
+          fill="var(--color-accent)"
+          fillOpacity="0.92"
+          stroke="var(--color-accent)"
+          strokeWidth="1"
+        />
+        <path
+          d="M44 8 Q 44 6 42 6 L 28 6 Q 26 7 26 9 L 26 44 Q 28 42 30 42 L 42 42 Q 44 42 44 40 Z"
+          fill="var(--color-accent)"
+          stroke="rgba(0,0,0,0.18)"
+          strokeWidth="0.5"
+        />
+        <line x1="13" y1="14" x2="22" y2="14" stroke="white" strokeOpacity="0.7" strokeWidth="1.2" />
+        <line x1="13" y1="20" x2="22" y2="20" stroke="white" strokeOpacity="0.7" strokeWidth="1.2" />
+        <line x1="13" y1="26" x2="22" y2="26" stroke="white" strokeOpacity="0.7" strokeWidth="1.2" />
+        <line x1="30" y1="14" x2="39" y2="14" stroke="white" strokeOpacity="0.7" strokeWidth="1.2" />
+        <line x1="30" y1="20" x2="39" y2="20" stroke="white" strokeOpacity="0.7" strokeWidth="1.2" />
+        <line x1="30" y1="26" x2="39" y2="26" stroke="white" strokeOpacity="0.7" strokeWidth="1.2" />
       </svg>
     );
   }

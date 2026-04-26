@@ -247,7 +247,7 @@ export function Window({
         onPointerMove={handleDragMove}
         onPointerUp={handleDragUp}
       />
-      <WindowContent>{children}</WindowContent>
+      <WindowContent noPadding={appDef.noContentPadding}>{children}</WindowContent>
 
       {!noResize && (
         <div
