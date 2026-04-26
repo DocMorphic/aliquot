@@ -35,8 +35,16 @@ interface ExperimentState {
   runsThisSession: number;
 }
 
+export interface AttachmentInput {
+  storagePath: string;
+  fileName: string;
+  contentType: string | null;
+  fileSize: number;
+}
+
 export interface RunOptions {
   currency?: "USD" | "EUR" | "GBP";
+  attachments?: AttachmentInput[];
 }
 
 interface ExperimentContextValue extends ExperimentState {
@@ -99,6 +107,7 @@ export function useExperimentProvider(): ExperimentContextValue {
           body: JSON.stringify({
             hypothesis,
             currency: options.currency ?? "USD",
+            attachments: options.attachments ?? [],
           }),
           signal: ctrl.signal,
         });

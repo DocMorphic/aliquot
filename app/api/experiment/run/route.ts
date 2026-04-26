@@ -1,28 +1,38 @@
 import type { NextRequest } from "next/server";
 import { runPipeline } from "@/lib/ai/pipeline";
+import { attachTempUploadsToExperiment } from "@/lib/supabase/files";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Vercel Hobby caps SSE streams at 60s. Our full pipeline can take
-// 100-150s for biology hypotheses with many catalog lookups; the
-// stream gets cut at 60s on Hobby, which means the user sees the
-// generator's tool-use partial events but the final plan_done may
-// not arrive. Set maxDuration explicitly to claim the full cap;
-// upgrade to Pro (300s) before the demo if the cut-off causes pain.
 export const maxDuration = 60;
+
+interface AttachmentInput {
+  storagePath: string;
+  fileName: string;
+  contentType: string | null;
+  fileSize: number;
+}
 
 /**
  * POST /api/experiment/run
- * Body: { hypothesis: string }
+ * Body: {
+ *   hypothesis: string;
+ *   currency?: "USD" | "EUR" | "GBP";
+ *   attachments?: { storagePath, fileName, contentType, fileSize }[]
+ * }
  * Response: text/event-stream of PipelineEvent JSON objects.
  *
- * Each event is emitted as `data: <json>\n\n` per the SSE protocol so
- * the browser EventSource (or our fetch + ReadableStream consumer in
- * use-experiment.ts) can parse a stream of JSON-encoded PipelineEvent
- * values.
+ * If attachments are supplied (uploaded earlier via /api/uploads/file),
+ * we associate them with the new experiment row right after Phase 1
+ * persists it, so the generator endpoint can pick them up later as
+ * AI context.
  */
 export async function POST(req: NextRequest) {
-  let body: { hypothesis?: string; currency?: "USD" | "EUR" | "GBP" };
+  let body: {
+    hypothesis?: string;
+    currency?: "USD" | "EUR" | "GBP";
+    attachments?: AttachmentInput[];
+  };
   try {
     body = await req.json();
   } catch {
@@ -41,6 +51,7 @@ export async function POST(req: NextRequest) {
   }
   const currency: "USD" | "EUR" | "GBP" =
     body.currency === "EUR" || body.currency === "GBP" ? body.currency : "USD";
+  const attachments = Array.isArray(body.attachments) ? body.attachments : [];
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -51,6 +62,13 @@ export async function POST(req: NextRequest) {
       try {
         for await (const event of runPipeline(hypothesis, { currency })) {
           send(event);
+          // After Phase 1 persists the experiment row, link any temp
+          // uploads to it so /generate can find them.
+          if (event.type === "experiment_started" && attachments.length > 0) {
+            void attachTempUploadsToExperiment(event.experimentId, attachments).catch(
+              (err) => console.warn("[run] attach uploads failed:", err.message)
+            );
+          }
         }
       } catch (err) {
         send({ type: "error", message: (err as Error).message ?? "Pipeline error" });

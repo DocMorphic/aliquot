@@ -4,6 +4,7 @@ import {
   loadExperimentForGeneration,
   saveDraftPlan,
 } from "@/lib/supabase/persist";
+import { loadAttachmentsForModel } from "@/lib/supabase/files";
 import type { ExperimentPlan } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -74,11 +75,22 @@ export async function POST(
     console.log(
       `[generate] start id=${id} domain=${exp.domain} hypothesis_len=${exp.hypothesis.length}`
     );
+    // Load any user-uploaded attachments and turn them into Anthropic
+    // content blocks. PDFs/images become document/image blocks; text
+    // files inline as text. Runs in parallel with the generator's
+    // own pre-fetch internally.
+    const attachments = await loadAttachmentsForModel(id);
+    if (attachments.length > 0) {
+      console.log(`[generate] loaded ${attachments.length} attachments for context`);
+    }
     // Race the generator against an in-process timeout so the catch
     // block always runs (and we always log + return a real error
     // before Vercel kills the function).
     const draftPlan = await Promise.race([
-      generatePlan(exp.hypothesis, exp.domain, exp.references, { currency }),
+      generatePlan(exp.hypothesis, exp.domain, exp.references, {
+        currency,
+        attachments,
+      }),
       new Promise<never>((_, reject) =>
         setTimeout(
           () =>

@@ -3,6 +3,7 @@ import { getAnthropic, cachedSystemBlock } from "../client";
 import { MODELS } from "@/lib/constants";
 import { tavilyCatalogSearchBatch } from "@/lib/search/tavily";
 import { getRecentCorrections } from "@/lib/supabase/corrections";
+import type { AttachmentForModel } from "@/lib/supabase/files";
 import type { Domain, ExperimentPlan, Reference } from "@/lib/types";
 import { extractReagents } from "./reagent-extractor";
 
@@ -89,6 +90,9 @@ const TOOLS: Anthropic.Messages.Tool[] = [
 
 export interface GeneratorOptions {
   currency?: "USD" | "EUR" | "GBP";
+  /** Files the user attached during prompting. Become Anthropic
+   *  content blocks the model can read alongside the hypothesis. */
+  attachments?: AttachmentForModel[];
 }
 
 interface CatalogHit {
@@ -143,6 +147,7 @@ export async function generatePlan(
     hits,
     corrections,
     currency: options.currency ?? "USD",
+    attachments: options.attachments ?? [],
   });
   console.log(`[generate] step3 done`);
   return result;
@@ -156,6 +161,7 @@ interface SynthesizeArgs {
   hits: CatalogHit[];
   corrections: Awaited<ReturnType<typeof getRecentCorrections>>;
   currency: "USD" | "EUR" | "GBP";
+  attachments: AttachmentForModel[];
 }
 
 async function synthesizePlan(args: SynthesizeArgs): Promise<ExperimentPlan> {
@@ -197,7 +203,12 @@ async function synthesizePlan(args: SynthesizeArgs): Promise<ExperimentPlan> {
         .join("\n")}`
     : "";
 
-  const userMessage = `# Hypothesis
+  // Anthropic supports multi-block user messages: [text, image, document, ...].
+  // We assemble the prose context as one text block, then append each
+  // user-uploaded file as its native block type (image, document) and
+  // inline text files into the prose. This lets Haiku/Sonnet read PDFs
+  // and images natively as additional grounding for the plan.
+  const textIntro = `# Hypothesis
 ${args.hypothesis}
 
 # Domain
@@ -208,25 +219,71 @@ ${args.currency}
 ${reagentsBlock}
 ${catalogBlock}
 ${correctionsBlock}
-${referencesBlock}
+${referencesBlock}`;
 
-Produce the plan now by calling submit_plan with the full plan JSON. Use the catalog data above for every material entry — extract real catalog numbers from the URLs/titles/snippets. Apply the expert corrections where applicable.`;
+  const fileNotes: string[] = [];
+  const fileBlocks: Anthropic.Messages.ContentBlockParam[] = [];
+  for (const a of args.attachments) {
+    if (a.kind === "image" && a.base64) {
+      fileNotes.push(`- Image: ${a.name}`);
+      fileBlocks.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type:
+            (a.contentType as
+              | "image/png"
+              | "image/jpeg"
+              | "image/webp"
+              | "image/gif") ?? "image/png",
+          data: a.base64,
+        },
+      });
+    } else if (a.kind === "document" && a.base64) {
+      fileNotes.push(`- PDF: ${a.name}`);
+      fileBlocks.push({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: a.base64,
+        },
+        title: a.name,
+      });
+    } else if (a.kind === "text" && a.text) {
+      fileNotes.push(
+        `- Text: ${a.name}${a.truncated ? " (truncated)" : ""}\n\n\`\`\`\n${a.text}\n\`\`\``
+      );
+    }
+  }
 
-  // Switched from Sonnet 4.6 (MODELS.reason) to Haiku 4.5 (MODELS.fast)
-  // for plan synthesis. With Tavily catalog data, corrections, and
-  // references already pre-fetched and handed to the model inline, this
-  // step is structured-output formatting — not novel reasoning. Haiku
-  // is 3-5x faster than Sonnet for this profile and produces a fully
-  // valid plan against the submit_plan schema. If quality regresses
-  // noticeably (e.g. less polished protocol prose), revert MODELS.fast
-  // → MODELS.reason here.
+  const userBlocks: Anthropic.Messages.ContentBlockParam[] = [
+    {
+      type: "text",
+      text:
+        textIntro +
+        (fileNotes.length
+          ? "\n\n# User-attached reference files\n" + fileNotes.join("\n")
+          : ""),
+    },
+    ...fileBlocks,
+    {
+      type: "text",
+      text:
+        "\nProduce the plan now by calling submit_plan with the full plan JSON. Use the catalog data above for every material entry — extract real catalog numbers from the URLs/titles/snippets. Apply expert corrections where applicable. Take user-attached files into account as grounding (paper PDFs should inform the protocol; equipment images should constrain the equipment list).",
+    },
+  ];
+
+  // Haiku 4.5 for plan synthesis — Tavily already grounded the catalog
+  // numbers, so this step is structured-output formatting of pre-fetched
+  // facts, not novel reasoning. 3-5× faster than Sonnet 4.6.
   const response = await client.messages.create({
     model: MODELS.fast,
     max_tokens: 8000,
     system: cachedSystemBlock(renderedSystem),
     tools: TOOLS,
     tool_choice: { type: "tool", name: "submit_plan" },
-    messages: [{ role: "user", content: userMessage }],
+    messages: [{ role: "user", content: userBlocks }],
   });
 
   // Find the submit_plan tool_use block
