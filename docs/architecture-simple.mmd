@@ -5,21 +5,23 @@ flowchart LR
     classDef ai fill:#7c2d12,stroke:#9a3412,color:#fff
     classDef ext fill:#4b5563,stroke:#6b7280,color:#fff
     classDef store fill:#312e81,stroke:#3730a3,color:#fff
+    classDef stack fill:#0c0a09,stroke:#27272a,color:#fff
 
-    User([Hypothesis]):::ui
-    Validate[Validate + rewrite if vague]:::phase
-    Classify[Classify domain]:::phase
-    LitQC[Lit QC]:::phase
-    Generate[Generate grounded plan]:::phase
-    Verify[Verify catalogs]:::phase
-    Confidence[Confidence score]:::phase
-    Plan([Plan]):::ui
-    Review([Scientist Review]):::ui
-    Reviser[Reviser Haiku]:::ai
-    Guidelines[(Domain guidelines)]:::store
-    OpenAlex[(OpenAlex)]:::ext
-    Tavily[(Tavily catalogs)]:::ext
-    DB[(Supabase)]:::store
+    User([Hypothesis<br/>Next.js 16 + React 19]):::ui
+    Validate[Validate + rewrite<br/>Haiku 4.5]:::phase
+    Classify[Classify domain<br/>Haiku 4.5]:::phase
+    LitQC[Lit QC<br/>Sonnet 4.6]:::phase
+    Generate[Generate grounded plan<br/>Haiku 4.5 synthesis]:::phase
+    Verify[Verify catalogs<br/>Sonnet 4.6]:::phase
+    Confidence[Confidence score<br/>Haiku 4.5]:::phase
+    Plan([Plan<br/>React + Tailwind 4]):::ui
+    Review([Scientist Review<br/>scope-aware feedback]):::ui
+    Reviser[Reviser<br/>Haiku 4.5]:::ai
+    Guidelines[(Domain guidelines<br/>pgvector embeddings)]:::store
+    OpenAlex[(OpenAlex API<br/>literature)]:::ext
+    Tavily[(Tavily Search<br/>vendor catalogs)]:::ext
+    DB[(Supabase<br/>Postgres + Storage)]:::store
+    Host[/Vercel Fluid Compute<br/>Node 24 · maxDuration 120s/]:::stack
 
     User --> Validate --> Classify --> LitQC
     LitQC <--> OpenAlex
@@ -36,3 +38,7 @@ flowchart LR
     LitQC -. persist .-> DB
     Verify -. persist .-> DB
     Review -. persist .-> DB
+
+    Host -. runs .-> Validate
+    Host -. runs .-> Generate
+    Host -. runs .-> Verify

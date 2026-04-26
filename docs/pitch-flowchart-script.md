@@ -9,26 +9,27 @@ screen, animating one node at a time as you speak. Total ~80 words →
 ## Script (5 beats)
 
 **Beat 1 — Hypothesis + Validate light up (~7s)**
-> A scientist types a hypothesis. The validator catches vague input
-> and rewrites it into a proper paragraph for the user to confirm.
+> A scientist types a hypothesis into a Next.js front end. Claude
+> Haiku validates it, and rewrites vague input into a proper
+> paragraph the user can confirm.
 
-**Beat 2 — Classify + Lit QC + OpenAlex light up (~6s)**
-> A classifier picks the domain. Lit QC pulls grounded references
-> from OpenAlex.
+**Beat 2 — Classify + Lit QC + OpenAlex light up (~7s)**
+> Haiku classifies the domain. Sonnet runs literature QC against
+> OpenAlex.
 
 **Beat 3 — Generate node lights up with Tavily and Guidelines arrows (~7s)**
-> The generator drafts a plan, grounded by parallel Tavily catalog
-> searches, and steered by domain-specific guidelines from prior
-> reviews.
+> Haiku synthesizes a grounded plan, fed by parallel Tavily catalog
+> searches, and steered by domain guidelines stored as pgvector
+> embeddings.
 
 **Beat 4 — Verify + Confidence + Plan light up (~6s)**
-> Every catalog number is re-verified live. A confidence pass scores
-> each claim. The plan is delivered.
+> Sonnet re-verifies every catalog number live. Haiku scores
+> per-claim confidence. The plan ships to the React UI.
 
 **Beat 5 — Review loop animates: Reviser feedback + Guidelines branch (~6s)**
-> The scientist reviews. Per-experiment notes route through the
-> reviser to edit this plan. General guidelines steer every future
-> plan in the domain. Supabase persists it all.
+> Scientists review. Per-experiment notes go through a Haiku reviser
+> that edits this plan. General guidelines feed the next run. Supabase
+> persists everything; Vercel runs the whole thing.
 
 ---
 
