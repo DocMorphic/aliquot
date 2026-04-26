@@ -60,10 +60,41 @@ export async function insertCorrections(
   if (corrections.length === 0) return { inserted: 0 };
   try {
     const sb = getServerSupabase();
-    // The schema has plan_id as a nullable FK; filter out invalid plan_ids
-    // (e.g. our `local-...` fallback IDs) so we don't break the FK constraint.
+
+    // The client passes `experimentId` as planId, but the corrections
+    // table FKs to plans.id, not experiments.id. Resolve actual plan
+    // ids by looking them up in batch — one query, idempotent.
+    const candidateIds = Array.from(
+      new Set(
+        corrections
+          .map((c) => c.planId)
+          .filter((id): id is string => isUuid(id))
+      )
+    );
+    const idMap = new Map<string, string>();
+    if (candidateIds.length > 0) {
+      // Try matching as experiment_id first (the common case from the
+      // ReviewWindow), then merge in any direct plan id matches.
+      const { data: byExp } = await sb
+        .from("plans")
+        .select("id, experiment_id")
+        .in("experiment_id", candidateIds)
+        .order("version", { ascending: false });
+      for (const row of byExp ?? []) {
+        if (!idMap.has(row.experiment_id)) idMap.set(row.experiment_id, row.id);
+      }
+      const stillUnknown = candidateIds.filter((id) => !idMap.has(id));
+      if (stillUnknown.length > 0) {
+        const { data: byPlan } = await sb
+          .from("plans")
+          .select("id")
+          .in("id", stillUnknown);
+        for (const row of byPlan ?? []) idMap.set(row.id, row.id);
+      }
+    }
+
     const rows = corrections.map((c) => ({
-      plan_id: isUuid(c.planId) ? c.planId : null,
+      plan_id: c.planId && idMap.has(c.planId) ? idMap.get(c.planId)! : null,
       domain: c.domain,
       section_path: c.sectionPath,
       original: c.original ?? null,
@@ -79,7 +110,7 @@ export async function insertCorrections(
   }
 }
 
-function isUuid(s: string | null): s is string {
+function isUuid(s: string | null | undefined): s is string {
   if (!s) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }

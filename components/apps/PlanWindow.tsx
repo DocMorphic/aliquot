@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useExperiment } from "@/hooks/use-experiment";
 import { useWindowManager } from "@/hooks/use-window-manager";
 import { STAGE_LABELS } from "@/lib/constants";
@@ -21,6 +21,7 @@ type Tab =
   | "timeline"
   | "validation"
   | "references"
+  | "files"
   | "caveats";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -31,11 +32,12 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "timeline", label: "Timeline" },
   { id: "validation", label: "Validation" },
   { id: "references", label: "References" },
+  { id: "files", label: "Files" },
   { id: "caveats", label: "Caveats" },
 ];
 
 export function PlanWindow() {
-  const { plan, status, stageMessage, hypothesis, error } = useExperiment();
+  const { plan, status, stageMessage, hypothesis, error, experimentId } = useExperiment();
   const { openWindow } = useWindowManager();
   const [tab, setTab] = useState<Tab>("protocol");
 
@@ -142,6 +144,7 @@ export function PlanWindow() {
           {tab === "timeline" && <TimelineTab plan={plan} pending={isPending} />}
           {tab === "validation" && <ValidationTab plan={plan} pending={isPending} />}
           {tab === "references" && <ReferencesTab plan={plan} pending={isPending} />}
+          {tab === "files" && <FilesTab experimentId={experimentId} />}
           {tab === "caveats" && <CaveatsTab plan={plan} pending={isPending} />}
         </div>
 
@@ -855,6 +858,282 @@ function ConfidenceMeter({ value }: { value: number }) {
       </span>
     </span>
   );
+}
+
+interface ExperimentFile {
+  id: string;
+  name: string;
+  type: string | null;
+  size: number | null;
+  uploadedAt: string;
+  url: string;
+}
+
+function FilesTab({ experimentId }: { experimentId: string | null }) {
+  const [files, setFiles] = useState<ExperimentFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const refresh = useCallback(async () => {
+    if (!experimentId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/experiments/${experimentId}/files`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { files: ExperimentFile[] };
+      setFiles(data.files);
+    } catch (err) {
+      setError((err as Error).message ?? "failed to load");
+    } finally {
+      setLoading(false);
+    }
+  }, [experimentId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const upload = useCallback(
+    async (file: File) => {
+      if (!experimentId) {
+        setError("Run an experiment first — files attach to the current plan.");
+        return;
+      }
+      setUploading(true);
+      setError(null);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch(`/api/experiments/${experimentId}/files`, {
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.error ?? `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as { file: ExperimentFile };
+        setFiles((prev) => [data.file, ...prev]);
+      } catch (err) {
+        setError((err as Error).message ?? "upload failed");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [experimentId]
+  );
+
+  const handleSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void upload(file);
+    e.target.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) void upload(file);
+  };
+
+  const handleDelete = async (fileId: string) => {
+    if (!experimentId) return;
+    if (!confirm("Remove this attachment?")) return;
+    setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    try {
+      const res = await fetch(`/api/experiments/${experimentId}/files/${fileId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        await refresh();
+      }
+    } catch {
+      await refresh();
+    }
+  };
+
+  if (!experimentId) {
+    return (
+      <p className="text-[12.5px]" style={{ color: "var(--color-text-muted)" }}>
+        Run an experiment first — files attach to the current plan.
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <p
+        className="mb-3 text-[11.5px]"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        Attach reference documents — protocols you found, prior datasets, image references,
+        anything relevant. PDFs / images / CSVs / docs up to 4MB. These are saved alongside
+        the experiment for the bench to download; they aren&rsquo;t fed back to the AI.
+      </p>
+
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => inputRef.current?.click()}
+        className="cursor-pointer border border-dashed p-6 text-center transition-colors"
+        style={{
+          background: dragOver
+            ? "rgba(30, 64, 175, 0.06)"
+            : "var(--color-surface)",
+          borderColor: dragOver
+            ? "var(--color-accent)"
+            : "var(--color-border-strong)",
+          borderRadius: 6,
+          color: "var(--color-text-secondary)",
+        }}
+      >
+        <div className="text-[12.5px]" style={{ fontWeight: 500 }}>
+          {uploading ? "Uploading…" : "Drop a file here or click to choose"}
+        </div>
+        <div
+          className="mt-1 text-[10.5px]"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          PDF · Word · Excel · CSV · TXT · MD · PNG · JPG (max 4MB)
+        </div>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.webp"
+        className="hidden"
+        onChange={handleSelect}
+      />
+
+      {error && (
+        <div
+          className="mt-2 border p-2 text-[11.5px]"
+          style={{
+            background: "rgba(185,28,28,0.06)",
+            borderColor: "var(--color-error)",
+            color: "var(--color-error)",
+            borderRadius: 4,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div className="mt-4">
+        <div className="mb-2 flex items-baseline justify-between">
+          <span
+            className="text-[10.5px] font-semibold tracking-wider"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            ATTACHED ({files.length})
+          </span>
+          {loading && (
+            <span
+              className="text-[10.5px]"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              loading…
+            </span>
+          )}
+        </div>
+        {files.length === 0 ? (
+          <p className="text-[12px]" style={{ color: "var(--color-text-muted)" }}>
+            No files yet.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {files.map((f) => (
+              <li
+                key={f.id}
+                className="flex items-center gap-3 border p-2.5"
+                style={{
+                  background: "var(--color-surface)",
+                  borderColor: "var(--color-border)",
+                  borderRadius: 4,
+                }}
+              >
+                <FileTypeIcon type={f.type} />
+                <div className="min-w-0 flex-1">
+                  <a
+                    href={f.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="content-link block truncate text-[12.5px]"
+                    style={{ color: "var(--color-text)", fontWeight: 500 }}
+                  >
+                    {f.name}
+                  </a>
+                  <div
+                    className="text-[10.5px]"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    {formatFileSize(f.size)} ·{" "}
+                    {new Date(f.uploadedAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                </div>
+                <button
+                  onClick={() => void handleDelete(f.id)}
+                  className="text-[10.5px]"
+                  style={{ color: "var(--color-error)" }}
+                  title="Remove attachment"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FileTypeIcon({ type }: { type: string | null }) {
+  let label = "FILE";
+  if (type) {
+    if (type.includes("pdf")) label = "PDF";
+    else if (type.includes("image")) label = "IMG";
+    else if (type.includes("csv")) label = "CSV";
+    else if (type.includes("word") || type.includes("officedocument.word")) label = "DOC";
+    else if (type.includes("sheet") || type.includes("excel")) label = "XLS";
+    else if (type.includes("json")) label = "JSON";
+    else if (type.includes("markdown")) label = "MD";
+    else if (type.includes("text")) label = "TXT";
+  }
+  return (
+    <span
+      className="flex h-9 w-9 shrink-0 items-center justify-center font-mono text-[9px]"
+      style={{
+        background: "var(--color-surface-alt)",
+        color: "var(--color-text-secondary)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 3,
+        fontWeight: 600,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function formatFileSize(bytes: number | null): string {
+  if (!bytes && bytes !== 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function EmptyOrSkeleton({ pending, hint }: { pending: boolean; hint: string }) {

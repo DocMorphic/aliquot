@@ -63,6 +63,18 @@ create index if not exists idx_corrections_embedding on corrections
   using ivfflat (embedding vector_cosine_ops)
   with (lists = 100);
 
+-- ===== experiment_files (user-uploaded attachments) =====
+create table if not exists experiment_files (
+  id uuid primary key default gen_random_uuid(),
+  experiment_id uuid references experiments(id) on delete cascade,
+  storage_path text not null,
+  file_name text not null,
+  content_type text,
+  file_size bigint,
+  uploaded_at timestamptz default now()
+);
+create index if not exists idx_experiment_files_experiment on experiment_files (experiment_id);
+
 -- ===== Row Level Security =====
 -- Hackathon scope: keep RLS open so anon key can read references + plans.
 -- Lock down before any real launch.
@@ -70,6 +82,7 @@ alter table experiments enable row level security;
 alter table plans enable row level security;
 alter table references_found enable row level security;
 alter table corrections enable row level security;
+alter table experiment_files enable row level security;
 
 -- Anyone can read (anon key)
 do $$ begin
@@ -84,6 +97,9 @@ do $$ begin
   end if;
   if not exists (select 1 from pg_policies where policyname = 'public_read_corrections') then
     create policy public_read_corrections on corrections for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'public_read_experiment_files') then
+    create policy public_read_experiment_files on experiment_files for select using (true);
   end if;
 end $$;
 -- Writes only via service role (default; service role bypasses RLS).
