@@ -38,7 +38,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function PlanWindow() {
   const { plan, status, stageMessage, hypothesis, error, experimentId } = useExperiment();
-  const { openWindow } = useWindowManager();
+  const { openWindow, focusWindow } = useWindowManager();
   const [tab, setTab] = useState<Tab>("protocol");
 
   const isPending = status !== "done" && status !== "failed" && status !== "queued";
@@ -49,6 +49,46 @@ export function PlanWindow() {
         <p className="text-[13px]" style={{ color: "var(--color-text-muted)" }}>
           Run a hypothesis from the Hypothesis window to see the plan here.
         </p>
+      </div>
+    );
+  }
+
+  // Pipeline paused waiting for the user to confirm or refine — the
+  // actionable UI lives in the Hypothesis window. Show a clear nudge
+  // here so the user isn't staring at a stuck loader.
+  if (status === "needs_confirmation" || status === "needs_refinement") {
+    return (
+      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+        <div className="text-[28px]" style={{ marginBottom: 8 }}>
+          ✋
+        </div>
+        <h3 className="text-[15px]" style={{ fontWeight: 600 }}>
+          {status === "needs_confirmation"
+            ? "Confirm the rewritten hypothesis"
+            : "Pick a refined hypothesis"}
+        </h3>
+        <p
+          className="mt-2 max-w-[400px] text-[12.5px]"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          {status === "needs_confirmation"
+            ? "Your hypothesis was vague — Aliquot rewrote it into a proper experimental claim. Open the Hypothesis window to accept, edit, or run as-is."
+            : "Your input was too vague to plan against. Open the Hypothesis window to pick a refined version or rewrite it yourself."}
+        </p>
+        <button
+          onClick={() => {
+            openWindow("hypothesis");
+            focusWindow("hypothesis");
+          }}
+          className="mt-4 px-4 py-2 text-[12.5px] font-medium transition-colors"
+          style={{
+            background: "var(--color-accent)",
+            color: "white",
+            borderRadius: 4,
+          }}
+        >
+          Open Hypothesis window
+        </button>
       </div>
     );
   }
