@@ -157,9 +157,9 @@ npm run dev
         ships to Vercel when you push to <code>main</code>.
       </p>
       <p>
-        Run the SQL from <code>supabase/schema.sql</code> in your Supabase project's
+        Run the SQL from <code>supabase/schema.sql</code> in your Supabase project&apos;s
         SQL editor before the first request. Re-run it whenever the file changes —
-        every migration block uses <code>add column if not exists</code> so it's safe.
+        every migration block uses <code>add column if not exists</code> so it&apos;s safe.
       </p>
     </Article>
   );
@@ -179,7 +179,7 @@ TAVILY_API_KEY=tvly-...
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...   # server-side only`}</CodeBlock>
       <p>
-        The service-role key bypasses RLS, so don't expose it in any client bundle.
+        The service-role key bypasses RLS, so don&apos;t expose it in any client bundle.
         For the hackathon scope, RLS is open on read; lock it down before any real
         launch.
       </p>
@@ -348,7 +348,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 await server.connect(new StdioServerTransport());`}</CodeBlock>
 
       <p>
-        Add it to Claude Desktop's <code>~/.config/claude/claude_desktop_config.json</code>:
+        Add it to Claude Desktop&apos;s <code>~/.config/claude/claude_desktop_config.json</code>:
       </p>
       <CodeBlock>{`{
   "mcpServers": {
@@ -395,7 +395,7 @@ function Limits() {
   return (
     <Article title="Notes & limits">
       <ul>
-        <li>Plans are persisted to Supabase. There's no auth — keep RLS open only on dev.</li>
+        <li>Plans are persisted to Supabase. There&apos;s no auth — keep RLS open only on dev.</li>
         <li>
           Tavily quota: 1k searches/mo on the free tier; the generator caps at 8
           reagent lookups per run.
@@ -406,7 +406,7 @@ function Limits() {
         </li>
         <li>
           The <code>scope</code> field on corrections decides whether feedback is a
-          one-off note or a domain-wide guideline. Only <code>scope: 'general'</code>{" "}
+          one-off note or a domain-wide guideline. Only <code>scope: &apos;general&apos;</code>{" "}
           rows are injected into future plans.
         </li>
         <li>

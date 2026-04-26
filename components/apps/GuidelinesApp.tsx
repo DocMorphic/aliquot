@@ -78,7 +78,7 @@ export function GuidelinesApp() {
             Guidelines
           </h3>
           <p className="mt-1 text-[11.5px]" style={{ color: "var(--color-text-muted)" }}>
-            Domain-wide rules the generator applies to every future plan. Review and remove anything that's gone stale.
+            Domain-wide rules the generator applies to every future plan. Review and remove anything that&apos;s gone stale.
           </p>
         </div>
         <button

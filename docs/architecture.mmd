@@ -1,0 +1,65 @@
+flowchart TD
+
+    classDef ui fill:#1e3a8a,stroke:#1e40af,color:#fff
+    classDef api fill:#0f766e,stroke:#115e59,color:#fff
+    classDef ai fill:#7c2d12,stroke:#9a3412,color:#fff
+    classDef ext fill:#4b5563,stroke:#6b7280,color:#fff
+    classDef db fill:#312e81,stroke:#3730a3,color:#fff
+
+    User([Scientist])
+    HW[HypothesisWindow]:::ui
+    PW[PlanWindow]:::ui
+    RW[ReviewWindow]:::ui
+    LW[Library / Guidelines / Docs]:::ui
+
+    User -->|types hypothesis + files| HW
+    HW -->|POST /api/uploads/file| Upload[/uploads.file/]:::api
+    Upload --> Storage[(Supabase Storage)]:::db
+
+    HW -->|POST /api/experiment/run SSE| Phase1{{Phase 1 SSE}}:::api
+    Phase1 --> Validator[Validator Haiku]:::ai
+    Validator -- specific --> Classifier[Classifier Haiku]:::ai
+    Validator -- vague --> NeedsRefine[/needs_refinement/]:::api
+    NeedsRefine --> HW
+
+    Classifier --> LitQC[Lit QC Sonnet]:::ai
+    LitQC --> OpenAlex[(OpenAlex API)]:::ext
+    OpenAlex --> LitQC
+    LitQC --> ExpRow[(experiments + references)]:::db
+    LitQC -->|experiment_started + lit_qc| HW
+    HW -->|experimentId| Phase2
+
+    Phase2{{Phase 2 POST generate}}:::api
+    Phase2 --> LoadAttachments[loadAttachmentsForModel]:::api
+    LoadAttachments --> Storage
+
+    Phase2 --> Reagent[Reagent extractor Haiku]:::ai
+    Reagent --> TavilyBatch[Tavily catalog batch]:::ext
+    TavilyBatch --> Generator[Generator Haiku synthesis]:::ai
+
+    Phase2 --> CorrFetch[getRecentCorrections scope=general]:::api
+    CorrFetch --> Corrections[(corrections)]:::db
+    CorrFetch --> Generator
+
+    Generator --> Skeptic[Skeptic + Revise Sonnet]:::ai
+    Skeptic --> Generator
+    Generator --> DraftPlan[(plans v1)]:::db
+    Generator -->|plan JSON| PW
+
+    PW -->|POST verify| Phase3{{Phase 3 POST verify}}:::api
+    Phase3 --> Verifier[Catalog verifier Sonnet]:::ai
+    Verifier --> TavilyVerify[(Tavily recheck)]:::ext
+    TavilyVerify --> Verifier
+    Verifier --> Confidence[Confidence annotator Haiku]:::ai
+    Confidence --> FinalPlan[(plans updated)]:::db
+    Confidence --> PW
+
+    PW --> RW
+    RW -->|POST /api/corrections| ApplyBranch{scope?}:::api
+    ApplyBranch -- experiment --> Reviser[Reviser Haiku edit this plan]:::ai
+    Reviser --> FinalPlan
+    Reviser -->|revised plan| PW
+    ApplyBranch -- general --> Corrections
+
+    LW -->|GET experiments + PATCH title + DELETE| ExpRow
+    LW -->|GET guidelines + DELETE| Corrections
