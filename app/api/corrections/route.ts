@@ -4,9 +4,14 @@ import {
   type NewCorrection,
   type CorrectionScope,
 } from "@/lib/supabase/corrections";
-import type { Domain } from "@/lib/types";
+import { revisePlan } from "@/lib/ai/agents/reviser";
+import { loadPersistedPlan, updatePersistedPlan } from "@/lib/supabase/persist";
+import type { Domain, ExperimentPlan } from "@/lib/types";
 
 export const runtime = "nodejs";
+// Reviser is a single Haiku call — should finish in 5-10s, but allow
+// headroom in case the plan is large.
+export const maxDuration = 60;
 
 /**
  * POST /api/corrections
@@ -96,8 +101,49 @@ export async function POST(req: NextRequest) {
       { status: 500, headers: { "content-type": "application/json" } }
     );
   }
+
+  // For experiment-scoped feedback, immediately revise *this* plan with
+  // a single Haiku pass. General-scope feedback only ever feeds the
+  // next-plan few-shot, so we skip the revise call there.
+  let revisedPlan: ExperimentPlan | null = null;
+  const experimentId = body.experimentId ?? null;
+  if (scope === "experiment" && experimentId) {
+    try {
+      const persisted = await loadPersistedPlan(experimentId);
+      if (persisted?.plan) {
+        const revised = await revisePlan(persisted.plan, records);
+        if (revised) {
+          // Carry forward fields the reviser may have dropped — keep the
+          // run stats and verification status pinned to the original.
+          const merged: ExperimentPlan = {
+            ...revised,
+            runStats: revised.runStats ?? persisted.plan.runStats,
+            verificationPending: persisted.plan.verificationPending,
+            confidenceSummary:
+              revised.confidenceSummary ?? persisted.plan.confidenceSummary,
+          };
+          await updatePersistedPlan(experimentId, merged);
+          revisedPlan = merged;
+        }
+      }
+    } catch (err) {
+      // Soft-fail: corrections are saved even if the revise step fails.
+      // The UI will get a confirmation but no revisedPlan, and PlanWindow
+      // keeps showing the original.
+      console.warn(
+        "[corrections] revise step soft-failed:",
+        (err as Error).message
+      );
+    }
+  }
+
   return new Response(
-    JSON.stringify({ ok: true, inserted: result.inserted, scope }),
+    JSON.stringify({
+      ok: true,
+      inserted: result.inserted,
+      scope,
+      revisedPlan,
+    }),
     { status: 200, headers: { "content-type": "application/json" } }
   );
 }

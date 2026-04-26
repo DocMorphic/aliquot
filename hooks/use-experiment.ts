@@ -52,6 +52,8 @@ interface ExperimentContextValue extends ExperimentState {
   cancelExperiment: () => void;
   loadFromHistory: (experimentId: string) => Promise<boolean>;
   reset: () => void;
+  /** Swap the in-memory plan (used when the reviser returns a corrected version). */
+  setPlan: (plan: ExperimentPlan) => void;
 }
 
 const initialState: ExperimentState = {
@@ -294,7 +296,11 @@ export function useExperimentProvider(): ExperimentContextValue {
     }
   }, []);
 
-  return { ...state, runExperiment, cancelExperiment, loadFromHistory, reset };
+  const setPlan = useCallback((plan: ExperimentPlan) => {
+    setState((prev) => ({ ...prev, plan }));
+  }, []);
+
+  return { ...state, runExperiment, cancelExperiment, loadFromHistory, reset, setPlan };
 }
 
 function isUuidLike(id: string): boolean {

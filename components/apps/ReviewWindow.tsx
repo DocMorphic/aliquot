@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useExperiment } from "@/hooks/use-experiment";
+import type { ExperimentPlan } from "@/lib/types";
 
 type CorrectionScope = "experiment" | "general";
 
@@ -22,7 +23,7 @@ const SECTION_OPTIONS = [
 ];
 
 export function ReviewWindow() {
-  const { plan, experimentId, hypothesis } = useExperiment();
+  const { plan, experimentId, hypothesis, setPlan } = useExperiment();
   const [drafts, setDrafts] = useState<CorrectionDraft[]>([
     { sectionPath: "protocol", original: "", corrected: "", rationale: "", rating: 4 },
   ]);
@@ -74,11 +75,26 @@ export function ReviewWindow() {
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setConfirmation(
-        scope === "general"
-          ? `Saved as a ${plan.domain} guideline. All future plans in this domain will reflect it.`
-          : "Saved as a note on this experiment only. Future plans are unaffected."
-      );
+      const data = (await res.json()) as {
+        ok?: boolean;
+        revisedPlan?: ExperimentPlan | null;
+      };
+      if (scope === "experiment" && data.revisedPlan) {
+        setPlan(data.revisedPlan);
+        setConfirmation(
+          "Applied. The plan above has been updated to reflect your feedback."
+        );
+      } else if (scope === "experiment") {
+        // Reviser soft-failed — corrections still saved as audit, but
+        // the plan didn't update. Tell the user explicitly.
+        setConfirmation(
+          "Saved as a note on this experiment. Couldn't apply it automatically — try rewording or running again."
+        );
+      } else {
+        setConfirmation(
+          `Saved as a ${plan.domain} guideline. All future plans in this domain will reflect it.`
+        );
+      }
       setDrafts([
         { sectionPath: "protocol", original: "", corrected: "", rationale: "", rating: 4 },
       ]);
@@ -119,7 +135,7 @@ export function ReviewWindow() {
             active={scope === "experiment"}
             onClick={() => setScope("experiment")}
             label="This experiment only"
-            sub="Note · won't change future plans"
+            sub="Updates this plan now · ~10s"
           />
           <ScopeButton
             active={scope === "general"}
@@ -269,10 +285,12 @@ export function ReviewWindow() {
         }}
       >
         {submitting
-          ? "Saving…"
+          ? scope === "experiment"
+            ? "Applying…"
+            : "Saving…"
           : scope === "general"
             ? "Save as guideline"
-            : "Save note on this experiment"}
+            : "Apply to this plan"}
       </button>
     </div>
   );
