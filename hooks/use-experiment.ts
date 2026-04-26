@@ -363,7 +363,7 @@ function applyEvent(
       setState((prev) => ({
         ...prev,
         status: "needs_confirmation",
-        stageMessage: "Confirm refined hypothesis",
+        stageMessage: "Did you mean this?",
         confirmation: {
           reason: event.reason,
           refined: event.refined,

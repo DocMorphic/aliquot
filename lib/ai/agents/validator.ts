@@ -26,15 +26,24 @@ Respond with STRICT JSON only:
 {
   "verdict": "specific" | "informal" | "too_vague",
   "reason": "<one sentence explaining what's missing — only set when not 'specific'>",
-  "refined": "<a single specific reformulation, ~25-50 words, with intervention + outcome + threshold + mechanism + control — only set when 'informal'>",
+  "refined": "<a single specific reformulation, ~25-50 words, with intervention + outcome with threshold + mechanism + control — set on BOTH 'informal' AND 'too_vague'>",
   "suggestions": [
     "<distinct specific reformulation A>",
     "<distinct specific reformulation B>"
   ]
 }
 
-Set "suggestions" to TWO plausible reformulations only when verdict is
-"too_vague". Leave "suggestions" as [] otherwise.
+When verdict is "too_vague", STILL produce a best-guess "refined" rewrite.
+Pick the most likely scientific interpretation of what the user wants to test.
+The user will see the rewrite and edit it if they meant something else — your
+job is to commit to a concrete hypothesis they can react to. Only leave
+"refined" empty when the input is so unrelated to science that no honest
+guess is possible (e.g. random keystrokes, profanity, off-topic chat).
+
+"suggestions" is a fallback ONLY for the case above where you cannot produce
+a refined rewrite. When you DO produce a refined rewrite, leave suggestions
+as []. When you cannot, populate suggestions with TWO plausible scientific
+reformulations the user might choose between.
 
 Lean toward "informal" over "too_vague" when there's any clear scientific
 direction in the input. Lean toward "informal" over "specific" when the

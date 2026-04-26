@@ -1,0 +1,23 @@
+flowchart LR
+
+    classDef ui fill:#1e3a8a,stroke:#1e40af,color:#fff
+    classDef phase fill:#0f766e,stroke:#115e59,color:#fff
+    classDef store fill:#4b5563,stroke:#6b7280,color:#fff
+
+    User([Hypothesis]):::ui
+    Validate[Validate]:::phase
+    LitQC[Lit QC]:::phase
+    Generate[Generate]:::phase
+    Verify[Verify + Score]:::phase
+    Plan([Plan]):::ui
+    Review([Scientist Review]):::ui
+    DB[(Supabase)]:::store
+
+    User --> Validate --> LitQC --> Generate --> Verify --> Plan
+    Plan --> Review
+    Review -- experiment-only edit --> Plan
+    Review -- general guideline --> Generate
+
+    LitQC -.persist.- DB
+    Verify -.persist.- DB
+    Review -.persist.- DB

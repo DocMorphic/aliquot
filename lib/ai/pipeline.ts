@@ -34,7 +34,14 @@ export async function* runPipeline(
   try {
     yield { type: "stage", stage: "validating", message: "Checking hypothesis specificity…" };
     const validation = await validateHypothesis(hypothesis);
-    if (validation.verdict === "too_vague") {
+    // Unified flow: any non-specific verdict that produced a `refined`
+    // rewrite goes through the confirmation panel ("Did you mean
+    // this?"). Only the rare case where the validator can't even guess
+    // a hypothesis (random keystrokes, off-topic) falls back to the
+    // suggestion-pick UI.
+    const hasRefined =
+      typeof validation.refined === "string" && validation.refined.trim().length > 0;
+    if (validation.verdict === "too_vague" && !hasRefined) {
       yield {
         type: "needs_refinement",
         reason:
@@ -44,7 +51,7 @@ export async function* runPipeline(
       };
       return;
     }
-    if (validation.verdict === "informal" && validation.refined) {
+    if ((validation.verdict === "informal" || validation.verdict === "too_vague") && hasRefined) {
       // Stop here — the client will show a confirmation panel asking
       // the user "did you mean this refined version?". They can
       // accept (which restarts the pipeline with the refined text),
@@ -54,7 +61,7 @@ export async function* runPipeline(
         reason:
           validation.reason ??
           "We sharpened your hypothesis into a proper experimental claim. Confirm before we proceed.",
-        refined: validation.refined,
+        refined: validation.refined!,
         original: hypothesis,
       };
       return;
