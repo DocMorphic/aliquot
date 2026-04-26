@@ -1,30 +1,34 @@
 # 30-second flowchart voiceover (backend video)
 
 Read while the simplified `docs/architecture-simple.mmd` diagram is on
-screen, animating one node at a time as you speak. Total ~75 words →
-~30 seconds at 150 wpm.
+screen, animating one node at a time as you speak. Total ~80 words →
+~32 seconds at 150 wpm.
 
 ---
 
-## Script (5 beats, ~6 seconds each)
+## Script (5 beats)
 
-**Beat 1 — Hypothesis node lights up**
-> A scientist types a hypothesis.
+**Beat 1 — Hypothesis + Validate light up (~7s)**
+> A scientist types a hypothesis. The validator catches vague input
+> and rewrites it into a proper paragraph for the user to confirm.
 
-**Beat 2 — Validate node lights up**
-> Aliquot validates it. If it's vague, the model rewrites it as a
-> proper paragraph and asks "did you mean this?".
+**Beat 2 — Classify + Lit QC + OpenAlex light up (~6s)**
+> A classifier picks the domain. Lit QC pulls grounded references
+> from OpenAlex.
 
-**Beat 3 — Lit QC node lights up**
-> Once confirmed, we ground it in real literature.
+**Beat 3 — Generate node lights up with Tavily and Guidelines arrows (~7s)**
+> The generator drafts a plan, grounded by parallel Tavily catalog
+> searches, and steered by domain-specific guidelines from prior
+> reviews.
 
-**Beat 4 — Generate → Verify nodes light up in sequence**
-> A grounded plan is generated, every catalog number is verified
-> live, and per-claim confidence is scored.
+**Beat 4 — Verify + Confidence + Plan light up (~6s)**
+> Every catalog number is re-verified live. A confidence pass scores
+> each claim. The plan is delivered.
 
-**Beat 5 — Plan → Review loop animates**
-> The scientist reviews. Per-experiment feedback edits this plan;
-> general guidelines steer every future plan in the domain.
+**Beat 5 — Review loop animates: Reviser feedback + Guidelines branch (~6s)**
+> The scientist reviews. Per-experiment notes route through the
+> reviser to edit this plan. General guidelines steer every future
+> plan in the domain. Supabase persists it all.
 
 ---
 
@@ -36,13 +40,13 @@ screen, animating one node at a time as you speak. Total ~75 words →
 3. Export → SVG (vector, scales to any video resolution).
 
 To animate node-by-node in your video editor:
-- Export 6 versions of the SVG, each with one more node visible
-  (delete the line-arrow rules below the `--> Plan` chain
-  progressively).
-- Or, in the editor, mask each node with an opacity keyframe so it
-  fades in on its beat.
+- Export 5 versions of the SVG, each with one more group of nodes
+  visible (delete the trailing arrow rules progressively).
+- Or, in the editor, mask each node group with an opacity keyframe so
+  it fades in on its beat.
 
 ## Word count
 
-~75 words, 5 beats × ~6s = ~30s with normal pacing. Cut Beat 4 to
-"Generated, verified, scored." if you want to land at 25s.
+~80 words, 5 beats × ~6.5s = ~32s with normal pacing. Drop "from prior
+reviews" in Beat 3 and "Supabase persists it all" in Beat 5 to land at
+~25s.
