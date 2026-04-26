@@ -11,7 +11,7 @@ seconds at a steady pace.
 **On-screen action: blank desktop, then live demo.**
 
 > Aliquot is an AI Scientist with a desktop interface — every
-> experiment is its own workspace.
+> experiment is its own workspace, built on Next.js 16 and React 19.
 
 **[Type into Hypothesis window: "Metformin extends yeast lifespan via AMPK"]**
 
@@ -19,21 +19,21 @@ seconds at a steady pace.
 
 **[Pipeline status streams: validator → classifier → lit QC]**
 
-> A validator gates vague prompts. A classifier picks the domain. The
-> Lit QC window streams in real references — every one a real paper.
+> A Haiku validator catches vague prompts and rewrites them for
+> confirmation. A classifier picks the domain. The Lit QC window
+> streams in real references from OpenAlex — every one a real paper.
 
 **[Plan window populates section by section]**
 
-> The Plan window streams a full protocol: materials with verified
-> catalog numbers, equipment, budget, timeline, validation, and a
-> per-claim confidence chart. Every catalog number links to a real
-> product page.
+> The Plan window streams in a full protocol: materials with verified
+> Tavily-grounded catalog numbers, equipment, budget, timeline,
+> validation, and a per-claim confidence chart.
 
 **[Open Scientist Review, type "delete step 1"]**
 
-> Disagree with something? Scientist Review applies your feedback to
-> *this* plan in ten seconds — or saves it as a domain-wide guideline
-> for every future run.
+> Disagree? Scientist Review applies your feedback to *this* plan in
+> ten seconds via a Haiku reviser — or saves it as a domain-wide
+> guideline that steers every future run.
 
 **[Cut to desktop showing Library, Guidelines, Docs icons]**
 
@@ -45,39 +45,39 @@ seconds at a steady pace.
 
 ## Backend video (60s) — "How it works"
 
-**On-screen: the architecture flowchart from `docs/architecture.md`,
-zoomed and animated as each phase is mentioned.**
+**On-screen: the simplified architecture flowchart from
+`docs/architecture-simple.mmd`. Zoom into each phase as it's
+mentioned. Tech labels stay visible throughout.**
 
-> Aliquot's backend is a 7-stage pipeline split into 3 HTTP phases —
-> each finishes inside Vercel's 60-second cap.
+> Aliquot's backend is a 7-stage pipeline split into 3 HTTP phases on
+> Vercel Fluid Compute — each finishes inside the 120-second cap.
 
-**[Highlight Phase 1 box]**
+**[Highlight Validate + Classify + Lit QC]**
 
-> Phase 1 streams over Server-Sent Events. A Haiku validator catches
-> vague prompts. A classifier picks biology, chemistry, physics, or
-> climate. OpenAlex returns grounded references, persisted to
-> Supabase.
+> Phase 1 streams Server-Sent Events. Claude Haiku 4.5 validates and
+> rewrites vague hypotheses. Haiku again classifies the domain. Sonnet
+> 4.6 runs literature QC against OpenAlex.
 
-**[Highlight Phase 2 box]**
+**[Highlight Generate, with arrows from Tavily and Guidelines]**
 
 > Phase 2 is the generator. Haiku extracts reagents. Tavily searches
-> fan out in parallel against vendor catalogs. Then Haiku synthesizes
-> the entire plan in a single shot — no tool-use loop, so it always
-> finishes fast.
+> fan out in parallel against vendor catalogs. Domain guidelines —
+> stored as pgvector embeddings in Supabase — feed back as few-shot
+> context. Haiku synthesizes the plan in a single shot, no tool loop.
 
-**[Highlight Phase 3 box]**
+**[Highlight Verify + Confidence]**
 
-> Phase 3 verifies every catalog number with a fresh Tavily check, runs
-> a confidence pass, and writes the final plan.
+> Phase 3 hands off to Sonnet for live catalog verification, then
+> Haiku scores per-claim confidence and persists the final plan.
 
 **[Highlight feedback loop arrows]**
 
-> Scientist feedback is scoped. "This experiment only" routes to a
-> reviser that edits the plan in place. "General guideline" feeds the
-> next plan's few-shot context. The system gets smarter as it
-> accumulates trusted knowledge.
+> Feedback is scope-aware. "This experiment only" routes through a
+> Haiku reviser. "General guideline" feeds the next plan's few-shot.
+> The system gets sharper with every reviewed run.
 
-> Anthropic, Tavily, Supabase, Next.js. Open source. MCP-ready.
+> Anthropic, Tavily, Supabase pgvector, Next.js, Vercel. Open source.
+> MCP-ready.
 
 ---
 
@@ -85,8 +85,8 @@ zoomed and animated as each phase is mentioned.**
 
 **Frontend**
 - Keep the same hypothesis text used in the script ("Metformin extends
-  yeast lifespan via AMPK") — short, biology, hits the lit QC stage
-  visibly.
+  yeast lifespan via AMPK") — short, biology, hits the Lit QC stage
+  visibly with a real paper.
 - Pre-clear the Library / Guidelines so the desktop looks intentional.
 - Don't read the on-screen text aloud — narrate the *value*, let the UI
   speak for itself.
@@ -94,19 +94,20 @@ zoomed and animated as each phase is mentioned.**
   watch loaders.
 
 **Backend**
-- Open the flowchart at <https://mermaid.live> with the contents of
-  `docs/architecture.md` pasted in. Export at 2x resolution.
+- Open the simplified flowchart at <https://mermaid.live> with the
+  contents of `docs/architecture-simple.mmd` pasted in. Export SVG at
+  2x.
 - Animate by zooming/panning into each phase as you mention it (any
-  screen recorder + Keynote/Premiere zoom keyframes works fine).
-- Show one quick code snippet — the Reviser system prompt or the Phase
-  2 generator function signature — to ground the architecture in real
+  screen recorder + Keynote/Premiere zoom keyframes works).
+- Show one quick code snippet — the Reviser system prompt or the
+  Phase 2 generator signature — to ground the architecture in real
   code.
 - End on the `mcp-aliquot.ts` snippet from `Docs → MCP integration` for
   the "anyone can use this" payoff.
 
 ## Word counts
 
-- Frontend: ~165 words → ~62s at 160 wpm. Trim "Disagree with
-  something?" to "Disagree?" if tight.
-- Backend: ~155 words → ~58s. Drop "of the entire plan in a single
-  shot" → "the plan in one shot" if tight.
+- Frontend: ~170 words → ~64s at 160 wpm. Drop "built on Next.js 16
+  and React 19" in the opener if tight.
+- Backend: ~165 words → ~62s. Drop "stored as pgvector embeddings in
+  Supabase" in Phase 2 if tight — the flowchart already shows it.
