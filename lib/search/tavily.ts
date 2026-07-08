@@ -5,7 +5,7 @@
 //   - `search_suppliers` to compare prices across suppliers
 //
 // Docs: https://docs.tavily.com/
-// Cost: covered by user's redeem code (not a concern for this hackathon).
+// Cost: covered by user's redeem code.
 
 const BASE = "https://api.tavily.com";
 

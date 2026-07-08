@@ -197,7 +197,7 @@ export function SettingsApp() {
         className="mt-auto border-t pt-3 text-[11px]"
         style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
       >
-        Aliquot · Hack-Nation × Fulcrum Science
+        Aliquot · The AI Scientist
       </div>
     </div>
   );

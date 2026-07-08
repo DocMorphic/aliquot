@@ -81,8 +81,8 @@ export function LibraryApp() {
 
   const handleRename = useCallback(
     async (id: string, title: string | null) => {
-      // Optimistic update — the server-side PATCH is fire-and-forget
-      // for hackathon scope. If it fails the next refresh will revert.
+      // Optimistic update — the server-side PATCH is fire-and-forget.
+      // If it fails the next refresh will revert.
       setExperiments((prev) =>
         prev?.map((e) => (e.id === id ? { ...e, title } : e)) ?? prev
       );

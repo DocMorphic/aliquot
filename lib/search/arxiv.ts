@@ -17,7 +17,7 @@ export async function searchArxiv(query: string, limit = 5): Promise<Reference[]
 /**
  * Tiny Atom-XML parser for arXiv responses. Avoids pulling in a full XML
  * library — just regex-extract the few fields we need. Brittle but fine
- * for a hackathon; replace with `fast-xml-parser` if results stop parsing.
+ * for now; replace with `fast-xml-parser` if results stop parsing.
  */
 function parseArxivAtom(xml: string): Reference[] {
   const entries = xml.split(/<entry>/).slice(1);

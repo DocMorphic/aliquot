@@ -1,8 +1,7 @@
-// Sample hypotheses lifted from the Hack-Nation × Fulcrum brief.
-// Wired as quick-start chips on the Hypothesis window so judges can demo
-// without typing. Each one names a specific intervention, a measurable
-// outcome with a threshold, a mechanistic reason, and an implied control —
-// the brief's bar for "what makes a strong input."
+// Sample hypotheses wired as quick-start chips on the Hypothesis window
+// so users can demo without typing. Each one names a specific intervention,
+// a measurable outcome with a threshold, a mechanistic reason, and an
+// implied control — the bar for "what makes a strong input."
 
 export interface SampleHypothesis {
   id: string;

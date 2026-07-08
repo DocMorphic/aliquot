@@ -180,8 +180,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...   # server-side only`}</CodeBlock>
       <p>
         The service-role key bypasses RLS, so don&apos;t expose it in any client bundle.
-        For the hackathon scope, RLS is open on read; lock it down before any real
-        launch.
+        RLS is currently open on read; lock it down before any real launch.
       </p>
     </Article>
   );

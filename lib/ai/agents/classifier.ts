@@ -32,6 +32,6 @@ export async function classifyDomain(hypothesis: string): Promise<Domain> {
   const text = block?.type === "text" ? block.text.trim().toLowerCase() : "";
   const m = text.match(/biology|chemistry|physics|climate/);
   if (m) return m[0] as Domain;
-  // Fallback — biology covers ~75% of likely hackathon prompts.
+  // Fallback — biology covers ~75% of likely prompts.
   return "biology";
 }

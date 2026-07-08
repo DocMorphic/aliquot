@@ -6,9 +6,6 @@ materials with verified catalog numbers, equipment, budget, timeline,
 validation, and per-claim confidence scores. Delivered through a
 desktop-OS interface where each experiment is its own workspace.
 
-Submission for **Hack-Nation × Fulcrum Science** — the AI Scientist
-challenge.
-
 - **Live demo:** <https://aliquot-pi.vercel.app>
 - **Repo:** <https://github.com/DocMorphic/aliquot>
 
@@ -76,5 +73,5 @@ copy-paste MCP server stub for Claude Desktop / Cursor.
 
 ## License
 
-Open source. Released for the Hack-Nation submission. No warranty —
-review every plan before you actually order materials.
+Open source. No warranty — review every plan before you actually
+order materials.

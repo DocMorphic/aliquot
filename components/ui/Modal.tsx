@@ -24,7 +24,7 @@ interface ModalProps {
  * (which renders in the OS chrome and breaks the OS-style illusion).
  *
  * Esc closes via onDismiss. Backdrop click closes via onDismiss.
- * No focus trap — adequate for the hackathon scope; revisit later.
+ * No focus trap — adequate for now; revisit later.
  */
 export function Modal({
   open,

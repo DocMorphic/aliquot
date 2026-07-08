@@ -1,12 +1,12 @@
 # Aliquot
 
-The AI Scientist — Hack-Nation × Fulcrum Science hackathon entry. Takes a plain-language scientific hypothesis and generates an operationally realistic experiment plan a real PI would trust enough to order materials and run.
+The AI Scientist — takes a plain-language scientific hypothesis and generates an operationally realistic experiment plan a real PI would trust enough to order materials and run.
 
 ## What it is
 
 A desktop-OS-styled web app (forked from `~/mein/os-folio`) where each scientific question opens an "experiment" workspace of draggable windows. Users see a literature-novelty check, then a fully grounded plan: protocol with citations, materials with real catalog numbers, budget, timeline, validation approach, and confidence scores.
 
-The differentiator vs. typical AI Scientist submissions is the **7-stage agent pipeline** (classifier → lit QC → generator → adversarial skeptic → revise → verifier → confidence annotator). Every claim grounded in a real source. Streaming status updates make the rigor visible during demo.
+The differentiator vs. typical AI Scientist tools is the **7-stage agent pipeline** (classifier → lit QC → generator → adversarial skeptic → revise → verifier → confidence annotator). Every claim grounded in a real source. Streaming status updates make the rigor visible during demo.
 
 Stretch goal: corrections from scientist reviews flow back into Supabase and inject as few-shot examples for the next plan in the same domain — the "system that learns" demo.
 
@@ -34,15 +34,15 @@ This is a recent Next.js version with breaking changes from older training data.
 - `lib/search/` — Semantic Scholar, arXiv, Tavily clients
 - `lib/supabase/` — Supabase client + seed corrections
 - `lib/types.ts` — plan/correction/experiment domain types
-- `content/sample-hypotheses.ts` — the 4 brief examples wired as quick-start chips
+- `content/sample-hypotheses.ts` — the 4 sample hypotheses wired as quick-start chips
 
 ## Commit style
 
 Short, present-tense. No co-authored-by tags unless asked. Don't commit when not asked.
 
-## What's been intentionally cut for 24h scope
+## What's been intentionally cut
 
 - Mobile responsiveness (desktop-only demo is acceptable)
-- TDD (too slow for hackathon)
-- Authentication (Supabase RLS open for hackathon)
+- TDD
+- Authentication (Supabase RLS open for now)
 - Multiple users / sessions (single-user demo flow)

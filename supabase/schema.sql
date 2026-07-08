@@ -86,7 +86,7 @@ create table if not exists experiment_files (
 create index if not exists idx_experiment_files_experiment on experiment_files (experiment_id);
 
 -- ===== Row Level Security =====
--- Hackathon scope: keep RLS open so anon key can read references + plans.
+-- Keep RLS open so anon key can read references + plans.
 -- Lock down before any real launch.
 alter table experiments enable row level security;
 alter table plans enable row level security;
